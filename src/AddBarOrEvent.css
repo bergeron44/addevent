@@ -1,0 +1,79 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f9f9f9;
+  margin: 0;
+  padding: 0;
+}
+
+.form-container {
+  max-width: 600px;
+  margin: 50px auto;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.form-title {
+  background: #6200ea;
+  color: white;
+  text-align: center;
+  padding: 15px;
+  font-size: 1.5em;
+  margin: 0;
+}
+
+.tab-container {
+  display: flex;
+  justify-content: space-around;
+  background: #f0f0f0;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease, color 0.3s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.tab.active {
+  background: #6200ea;
+  color: white;
+  border-bottom: 3px solid #ffea00;
+}
+
+.form-content {
+  padding: 20px;
+}
+
+.form-content input,
+.form-content textarea {
+  width: calc(100% - 20px);
+  margin: 10px auto;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1em;
+  display: block;
+}
+
+.submit-btn {
+  width: calc(100% - 20px);
+  padding: 10px;
+  margin: 20px auto;
+  background: #6200ea;
+  color: white;
+  font-size: 1.1em;
+  font-weight: bold;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.submit-btn:hover {
+  background: #4b00c0;
+}
