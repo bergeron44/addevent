@@ -110,13 +110,13 @@ const AddBarOrEvent = () => {
           className={`tab ${type === "bar" ? "active" : ""}`}
           onClick={() => setType("bar")}
         >
-          Add Bar
+          הוסף הנחה
         </button>
         <button
           className={`tab ${type === "event" ? "active" : ""}`}
           onClick={() => setType("event")}
         >
-          Add Event
+          הוסף ארוע
         </button>
       </div>
 
@@ -207,12 +207,14 @@ const AddBarOrEvent = () => {
                 onChange={handleInputChange}
                 required
                 >
-                <option value="">Select Event Type</option>
-                <option value="Party">Party</option>
-                <option value="Concert">Concert</option>
-                <option value="Festival">Festival</option>
-                <option value="Conference">Conference</option>
-                <option value="Standup">Standup</option>
+                <option value=""> סוג הארוע</option>
+                <option value="Party">מסיבה</option>
+                <option value="Concert">הופעה</option>
+                <option value="student">יריד סטודנטים</option>
+                <option value="lecture">הרצאה</option>
+                <option value="Standup">סטאנד-אפ</option>
+                <option value="houseparty">מסיבת דירה</option>
+                <option value="sport">ארוע ספורט</option>
                 </select>
             <textarea
               name="description"
