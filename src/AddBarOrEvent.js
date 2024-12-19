@@ -164,7 +164,7 @@ const AddBarOrEvent = () => {
 
   return (
     <div className="form-container">
-      <h2 className="form-title">Add {type === "bar" ? "Bar" : "Event"}</h2>
+      <h2 className="form-title">Add {type === "bar" ? "Sale" : "Event"}</h2>
       <div className="tab-container">
         <button
           className={`tab ${type === "bar" ? "active" : ""}`}
