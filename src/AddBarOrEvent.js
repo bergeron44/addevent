@@ -280,13 +280,23 @@ const AddBarOrEvent = () => {
               required
             >
               <option value="">Event Type</option>
-              <option value="Party">Party</option>
-              <option value="Concert">Concert</option>
-              <option value="Student Fair">Student Fair</option>
-              <option value="Lecture">Lecture</option>
-              <option value="Stand-up">Stand-up</option>
-              <option value="House Party">House Party</option>
-              <option value="Sport">Sport Event</option>
+              <option value="party">מסיבה</option>
+              <option value="concert">מופע</option>
+              <option value="studentfair">יריד תעסוקה</option>
+              <option value="student">ארוע של סטודנטים</option>
+              <option value="Lecture">הרצאה</option>
+              <option value="standup">סטאנד אפ</option>
+              <option value="houseparty">מסיבת דירה </option>
+              <option value="sport">ארוע ספורט</option>
+              <option value="socialinvolvement"> התנדבות</option>
+              <option value="academy"> אקדמיה</option>
+              <option value="culture"> תרבות</option>
+              <option value="holidays"> חגים ומועדים</option>
+              <option value="welfare"> רווחה</option>
+              <option value="show"> ארוע ענקי</option>
+
+
+
             </select>
             <textarea
               name="description"
