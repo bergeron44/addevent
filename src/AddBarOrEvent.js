@@ -40,6 +40,7 @@ const locations = {
   "Forum club": { lat: 31.221058,  lng: 34.803028},
   "Beer Sheva River Park": { lat: 31.237292,  lng: 34.828784},
   "Beer Sheva Youth Center": { lat: 31.241839 ,  lng: 34.788323},
+  "park next to benji": { lat: 31.264301 , lng: 34.797737 },
   
   
   "Rega B Park Beer Sheva": { lat: 31.257014, lng: 34.794165},
