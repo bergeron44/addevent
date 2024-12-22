@@ -41,9 +41,10 @@ const locations = {
   "Beer Sheva River Park": { lat: 31.237292,  lng: 34.828784},
   "Beer Sheva Youth Center": { lat: 31.241839 ,  lng: 34.788323},
   "park next to benji": { lat: 31.264301 , lng: 34.797737 },
+  "park next to benji": { lat: 31.264301 , lng: 34.797737 },
+
   
-  
-  "Rega B Park Beer Sheva": { lat: 31.257014, lng: 34.794165},
+  "dorms": { lat: 31.263274, lng: 34.797049},
   "Bengi": { lat: 31.264579, lng: 34.797307},
   "Lee Office": { lat: 31.264396, lng: 34.798339},
   "BarGiora": { lat: 31.2612,lng: 34.7925},
