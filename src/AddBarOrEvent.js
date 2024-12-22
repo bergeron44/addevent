@@ -6,18 +6,20 @@ const API_BASE_URL = "https://final-project-server-sk27.onrender.com";
 const locations = {
   "Beer Sheva": { lat: 31.252121, lng: 34.786609 },
   "Ben Gurion University of the Negev": { lat: 31.261436,lng: 34.799552},
-  "Zalman Aranne Central Library": { lat: 31.262074, lng: 34.800803 },
-  "Kreitman Building": { lat: 31.262092,lng: 34.802325 },
+  "Zalman Aranne Central Library 22": { lat: 31.262074, lng: 34.800803 },
+  "Kreitman Building 26": { lat: 31.262092,lng: 34.802325 },
   "Mexicani Ben Gurion": { lat: 31.261990,lng: 34.804332},
   "The student house building 70": { lat: 31.263123, lng: 34.801976 },
   "Building 90 Ben Gurion University": { lat: 31.264854,  lng: 34.803088 },
-  "Husidman Center for science-seeking youth": { lat: 31.261327, lng: 34.801319 },
+  "Husidman Center for science-seeking youth 25": { lat: 31.261327, lng: 34.801319 },
   "Parking 1 Ben Gurion University": { lat: 31.263488, lng: 34.799791},
   "Sports Center Ben-Gurion University": { lat: 31.261853, lng:  34.807128 },
   "Gate of Mexico Ben Gurion University": { lat: 31.262344, lng: 34.805657},
   "Building 34 Ben Gurion University": { lat: 31.262046, lng: 34.803392 },
   "Ben Gurion Soroka Gate": { lat: 31.261276 , lng: 34.801194 },
   "Joya Claire Sonnenfeldt Auditorium ": { lat: 31.262523 , lng: 34.800567 },
+  "Samuel and Milada Ayrton University Center Building 71": { lat: 31.263040 , lng: 34.801191 },
+
 
   "Writers Park": { lat: 31.255490, lng: 34.788592},
   "Block": { lat: 31.259226, lng: 34.797065},
