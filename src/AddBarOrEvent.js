@@ -10,6 +10,8 @@ const locations = {
   "Kreitman Building 26": { lat: 31.262092,lng: 34.802325 },
   "Mexicani Ben Gurion": { lat: 31.261990,lng: 34.804332},
   "The student house building 70": { lat: 31.263123, lng: 34.801976 },
+  "The student house building 70 2": { lat: 31.263421, lng: 34.801833 },
+  "The student house building 70 3": { lat: 31.262772, lng: 34.801775 },
   "Building 90 Ben Gurion University": { lat: 31.264854,  lng: 34.803088 },
   "Husidman Center for science-seeking youth 25": { lat: 31.261327, lng: 34.801319 },
   "Parking 1 Ben Gurion University": { lat: 31.263488, lng: 34.799791},
