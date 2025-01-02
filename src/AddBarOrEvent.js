@@ -21,6 +21,16 @@ const locations = {
   "Ben Gurion Soroka Gate": { lat: 31.261276 , lng: 34.801194 },
   "Joya Claire Sonnenfeldt Auditorium ": { lat: 31.262523 , lng: 34.800567 },
   "Samuel and Milada Ayrton University Center Building 71": { lat: 31.263040 , lng: 34.801191 },
+  "shirotim binian tasia vnihol":{ lat: 31.261518705571337, lng: 34.79957360831921  },
+  "shirotim sifria":{ lat: 31.26190950821855,  lng: 34.80067689675296 },
+  "shirotim beit hstodent":{ lat: 31.26320747155318, lng: 34.80208286758945 },
+  "shirotim cimistry ":{ lat: 31.262347859041057 , lng: 34.80514194991204},
+  "shirotim binian 72":{ lat: 31.26264915989865 , lng: 34.80038726816652 },
+  "shirotim binian 35":{ lat: 31.26165007721267 , lng: 34.804026376857664 },
+  "micro 90":{ lat: 31.264816724131336,  lng: 34.803235110727705 },
+  "micro 35":{ lat: 31.26171019017748,  lng: 34.8043908524804 },
+  "micro beithstodent":{ lat: 31.26313500217773,  lng: 34.80221354947629 },
+  "micro  32-35":{ lat: 31.26174627396267,  lng: 34.80384811580903 },
 
 
   "Writers Park": { lat: 31.255490, lng: 34.788592},
@@ -62,7 +72,8 @@ const locations = {
  "Zalame ACB": { lat: 31.243063,lng: 34.804604},
  "Château D'Or": { lat: 31.240597,lng: 34.788716},
  "Roots Bar & Kitchen": { lat: 31.267882,lng: 34.800137},
- "halutz 33": { lat: 31.238207,lng: 34.788143},
+ "halutz 33": { lat: 31.238207,lng: 34.788143}, 
+ "doctor": { lat: 31.25911839503933,lng: 34.79560231527858},
 };
 const AddBarOrEvent = () => {
   const [type, setType] = useState("bar");
