@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import emailjs from '@emailjs/browser';
 import "./App.css";
 
 // קומפוננט התחברות מנהלים
@@ -184,12 +185,26 @@ const OrganizationData = ({ organization, onLogout }) => {
 
   const handleAuthorizeToggle = async (userId, currentStatus) => {
     try {
+      const user = users.find(u => u._id === userId);
+      const newStatus = !user.is_authorized;
+      
       // עדכון מקומי ראשית
       setUsers(users.map(user => 
         user._id === userId 
-          ? { ...user, is_authorized: !user.is_authorized }
+          ? { ...user, is_authorized: newStatus }
           : user
       ));
+
+      // אם המשתמש אושר - שלח מייל אישור
+      if (newStatus && user.email) {
+        try {
+          await sendApprovalEmail(user.email, user.full_name || user.username, organization.name);
+          console.log('מייל אישור נשלח בהצלחה!');
+        } catch (emailError) {
+          console.error('שגיאה בשליחת מייל אישור:', emailError);
+          // לא נעצור את התהליך אם המייל נכשל
+        }
+      }
 
       // ניסיון לעדכן בשרת
       try {
@@ -200,6 +215,29 @@ const OrganizationData = ({ organization, onLogout }) => {
     } catch (error) {
       console.error("Error updating user status:", error);
       alert("שגיאה בעדכון סטטוס המשתמש");
+    }
+  };
+
+  // פונקציה לשליחת מייל אישור
+  const sendApprovalEmail = async (userEmail, userName, organizationName) => {
+    try {
+      // תבנית המייל שתואמת לתבנית ב-EmailJS
+      const templateParams = {
+        to_email: userEmail,
+        to_name: userName,
+        organization_name: organizationName,
+        approval_date: new Date().toLocaleDateString('he-IL')
+      };
+      
+      // שליחה דרך EmailJS עם המפתחות האמיתיים
+      await emailjs.send('service_8lbirmd', 'template_z1vwxve', templateParams, '4TqCN9vQEhk_heUkz');
+      
+      // הצגת הודעה למשתמש שהמייל נשלח
+      alert(`מייל אישור נשלח בהצלחה ל-${userEmail}`);
+      
+    } catch (error) {
+      console.error('שגיאה בשליחת מייל:', error);
+      throw error;
     }
   };
 
