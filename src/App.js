@@ -123,6 +123,9 @@ const AdminLogin = ({ onLogin }) => {
 const OrganizationData = ({ organization, onLogout }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('users'); // 'users' או 'reviews'
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
 
   // קבלת משתמשי הארגון
   useEffect(() => {
@@ -181,6 +184,33 @@ const OrganizationData = ({ organization, onLogout }) => {
       }
     };
     fetchUsers();
+  }, [organization._id]);
+
+  // קבלת ביקורות הארגון
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const response = await axios.get(`https://bangyourhead-server.onrender.com/api/reviews/organization/${organization._id}`);
+        console.log("Reviews from API:", response.data);
+        
+        // הביקורות נמצאות ב-response.data.message ולא ב-response.data.data
+        const reviewsData = response.data.message || [];
+        console.log("Reviews data:", reviewsData);
+        
+        setReviews(reviewsData);
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+        // ביקורות לדוגמה אם השרת לא עובד
+        setReviews([
+          { _id: "review1", review: "ביקורת לדוגמה 1", rating: 4, userId: { full_name: "משתמש לדוגמה 1" }, createdAt: new Date() },
+          { _id: "review2", review: "ביקורת לדוגמה 2", rating: 5, userId: { full_name: "משתמש לדוגמה 2" }, createdAt: new Date() },
+          { _id: "review3", review: "ביקורת לדוגמה 3", rating: 3, userId: { full_name: "משתמש לדוגמה 3" }, createdAt: new Date() }
+        ]);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+    fetchReviews();
   }, [organization._id]);
 
   const handleAuthorizeToggle = async (userId, currentStatus) => {
@@ -260,6 +290,22 @@ const OrganizationData = ({ organization, onLogout }) => {
       </div>
 
       <div className="data-content">
+        {/* כפתורי מעבר בין הטבלאות */}
+        <div className="tab-switcher">
+          <button 
+            className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            👥 משתמשי הארגון
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'reviews' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reviews')}
+          >
+            📊 ביקורות הארגון
+          </button>
+        </div>
+
         <div className="org-details-section">
           <h2>🏢 פרטי הארגון</h2>
           <div className="org-details">
@@ -292,50 +338,108 @@ const OrganizationData = ({ organization, onLogout }) => {
           </div>
         </div>
 
-        <div className="users-section">
-          <h2>👥 משתמשי הארגון</h2>
-          <div className="table-container">
-            <table className="users-table">
-              <thead>
-                <tr>
-                  <th>שם משתמש</th>
-                  <th>אימייל</th>
-                  <th>טלפון</th>
-                  <th>סטטוס אישור</th>
-                  <th>פעולות</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user._id} className={user.is_authorized ? "authorized" : "not-authorized"}>
-                    <td>{user.full_name || user.username || "אין שם"}</td>
-                    <td>{user.email || "אין אימייל"}</td>
-                    <td>{user.phone || "אין טלפון"}</td>
-                    <td>
-                      <span className={`status-badge ${user.is_authorized ? "authorized" : "not-authorized"}`}>
-                        {user.is_authorized ? "מאושר" : "לא מאושר"}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => handleAuthorizeToggle(user._id, user.is_authorized)}
-                        className={`toggle-button ${user.is_authorized ? "deauthorize" : "authorize"}`}
-                      >
-                        {user.is_authorized ? "ביטול אישור" : "אשר"}
-                      </button>
-                    </td>
+        {/* טבלת משתמשים */}
+        {activeTab === 'users' && (
+          <div className="users-section">
+            <h2>👥 משתמשי הארגון</h2>
+            <div className="table-container">
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>שם משתמש</th>
+                    <th>אימייל</th>
+                    <th>טלפון</th>
+                    <th>סטטוס אישור</th>
+                    <th>פעולות</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr key={user._id} className={user.is_authorized ? "authorized" : "not-authorized"}>
+                      <td>{user.full_name || user.username || "אין שם"}</td>
+                      <td>{user.email || "אין אימייל"}</td>
+                      <td>{user.phone || "אין טלפון"}</td>
+                      <td>
+                        <span className={`status-badge ${user.is_authorized ? "authorized" : "not-authorized"}`}>
+                          {user.is_authorized ? "מאושר" : "לא מאושר"}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => handleAuthorizeToggle(user._id, user.is_authorized)}
+                          className={`toggle-button ${user.is_authorized ? "deauthorize" : "authorize"}`}
+                        >
+                          {user.is_authorized ? "ביטול אישור" : "אשר"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="stats">
-            <p>סה"כ משתמשים: {users.length}</p>
-            <p>משתמשים מאושרים: {users.filter(u => u.is_authorized).length}</p>
-            <p>משתמשים לא מאושרים: {users.filter(u => !u.is_authorized).length}</p>
+            <div className="stats">
+              <p>סה"כ משתמשים: {users.length}</p>
+              <p>משתמשים מאושרים: {users.filter(u => u.is_authorized).length}</p>
+              <p>משתמשים לא מאושרים: {users.filter(u => !u.is_authorized).length}</p>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* טבלת ביקורות */}
+        {activeTab === 'reviews' && (
+          <div className="reviews-section">
+            <h2>📊 ביקורות הארגון</h2>
+            {reviewsLoading ? (
+              <div className="loading-container">
+                <div className="spinner"></div>
+                <p>טוען ביקורות...</p>
+              </div>
+            ) : (
+              <>
+                <div className="table-container">
+                  <table className="reviews-table">
+                    <thead>
+                      <tr>
+                        <th>אימייל</th>
+                        <th>ביקורת</th>
+                        <th>דירוג</th>
+                        <th>תאריך</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.isArray(reviews) && reviews.map((review) => (
+                        <tr key={review._id} className="review-row">
+                          <td>{review.userId?.email || "אין אימייל"}</td>
+                          <td className="review-text">{review.review}</td>
+                          <td>
+                            <div className="rating-stars">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <span 
+                                  key={star} 
+                                  className={`star ${star <= review.rating ? 'filled' : 'empty'}`}
+                                >
+                                  {star <= review.rating ? '⭐' : '☆'}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td>{new Date(review.createdAt).toLocaleDateString('he-IL')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="stats">
+                  <p>סה"כ ביקורות: {Array.isArray(reviews) ? reviews.length : 0}</p>
+                  <p>דירוג ממוצע: {Array.isArray(reviews) && reviews.length > 0 ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) : '0.0'}</p>
+                  <p>ביקורות חיוביות (4-5 כוכבים): {Array.isArray(reviews) ? reviews.filter(r => r.rating >= 4).length : 0}</p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

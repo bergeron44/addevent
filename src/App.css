@@ -402,6 +402,116 @@ body {
   transform: translateY(-1px);
 }
 
+/* Tab Switcher Styles */
+.tab-switcher {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 30px;
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e8f0fe;
+}
+
+.tab-button {
+  background: #f8f9fa;
+  color: #6c757d;
+  border: 2px solid #e9ecef;
+  padding: 15px 30px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.tab-button:hover {
+  background: #e9ecef;
+  border-color: #6c757d;
+  transform: translateY(-2px);
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+/* Reviews Section Styles */
+.reviews-section h2 {
+  color: #2c3e50;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.reviews-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 15px;
+  overflow: hidden;
+  min-width: 600px;
+}
+
+.reviews-table th {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 18px 15px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.reviews-table td {
+  padding: 18px 15px;
+  border-bottom: 1px solid #ecf0f1;
+  text-align: right;
+  vertical-align: middle;
+}
+
+.reviews-table tr:hover {
+  background: #f8f9fa;
+}
+
+.review-row {
+  background: white;
+}
+
+.review-text {
+  max-width: 300px;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+
+.rating-stars {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.star {
+  font-size: 1.2rem;
+  transition: all 0.2s ease;
+}
+
+.star.filled {
+  color: #ffc107;
+}
+
+.star.empty {
+  color: #e9ecef;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .organization-data-container {
@@ -418,6 +528,18 @@ body {
 @media (max-width: 768px) {
   .App {
     padding: 10px;
+  }
+  
+  .tab-switcher {
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px;
+  }
+  
+  .tab-button {
+    min-width: auto;
+    padding: 12px 20px;
+    font-size: 1rem;
   }
   
   .login-card {
