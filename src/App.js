@@ -126,6 +126,7 @@ const OrganizationData = ({ organization, onLogout }) => {
   const [activeTab, setActiveTab] = useState('users'); // 'users' או 'reviews'
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [pointsModal, setPointsModal] = useState({ isOpen: false, user: null, action: null, points: 0 });
 
   // קבלת משתמשי הארגון
   useEffect(() => {
@@ -217,10 +218,10 @@ const OrganizationData = ({ organization, onLogout }) => {
     try {
       const user = users.find(u => u._id === userId);
       const newStatus = !user.is_authorized;
-      
+
       // עדכון מקומי ראשית
-      setUsers(users.map(user => 
-        user._id === userId 
+      setUsers(users.map(user =>
+        user._id === userId
           ? { ...user, is_authorized: newStatus }
           : user
       ));
@@ -245,6 +246,55 @@ const OrganizationData = ({ organization, onLogout }) => {
     } catch (error) {
       console.error("Error updating user status:", error);
       alert("שגיאה בעדכון סטטוס המשתמש");
+    }
+  };
+
+  const openPointsModal = (user, action) => {
+    setPointsModal({ isOpen: true, user, action, points: 1 });
+  };
+
+  const closePointsModal = () => {
+    setPointsModal({ isOpen: false, user: null, action: null, points: 0 });
+  };
+
+  const handlePointsUpdate = async () => {
+    try {
+      const { user, action, points } = pointsModal;
+      if (!user || !action || points <= 0) {
+        alert("אנא הכנס כמות נקודות תקינה");
+        return;
+      }
+
+      const currentPoints = user.points || 0;
+      let newPoints;
+
+      if (action === 'add') {
+        newPoints = currentPoints + points;
+      } else if (action === 'subtract') {
+        newPoints = Math.max(0, currentPoints - points); // לא יכול להגיע למספר שלילי
+      } else {
+        alert("פעולה לא תקינה");
+        return;
+      }
+
+      // עדכון מקומי ראשית
+      setUsers(users.map(u =>
+        u._id === user._id
+          ? { ...u, points: newPoints }
+          : u
+      ));
+
+      // עדכון בשרת
+      await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${user._id}/points`, {
+        points: newPoints
+      });
+
+      closePointsModal();
+      alert(`נקודות המשתמש עודכנו בהצלחה!`);
+
+    } catch (error) {
+      console.error("Error updating user points:", error);
+      alert("שגיאה בעדכון נקודות המשתמש");
     }
   };
 
@@ -349,6 +399,7 @@ const OrganizationData = ({ organization, onLogout }) => {
                     <th>שם משתמש</th>
                     <th>אימייל</th>
                     <th>טלפון</th>
+                    <th>נקודות</th>
                     <th>סטטוס אישור</th>
                     <th>פעולות</th>
                   </tr>
@@ -360,17 +411,40 @@ const OrganizationData = ({ organization, onLogout }) => {
                       <td>{user.email || "אין אימייל"}</td>
                       <td>{user.phone || "אין טלפון"}</td>
                       <td>
+                        <span className="points-display">
+                          {user.points || 0} נקודות
+                        </span>
+                      </td>
+                      <td>
                         <span className={`status-badge ${user.is_authorized ? "authorized" : "not-authorized"}`}>
                           {user.is_authorized ? "מאושר" : "לא מאושר"}
                         </span>
                       </td>
                       <td>
-                        <button
-                          onClick={() => handleAuthorizeToggle(user._id, user.is_authorized)}
-                          className={`toggle-button ${user.is_authorized ? "deauthorize" : "authorize"}`}
-                        >
-                          {user.is_authorized ? "ביטול אישור" : "אשר"}
-                        </button>
+                        <div className="actions-container">
+                          <button
+                            onClick={() => handleAuthorizeToggle(user._id, user.is_authorized)}
+                            className={`toggle-button ${user.is_authorized ? "deauthorize" : "authorize"}`}
+                          >
+                            {user.is_authorized ? "ביטול אישור" : "אשר"}
+                          </button>
+                          <div className="points-actions">
+                            <button
+                              onClick={() => openPointsModal(user, 'add')}
+                              className="points-button add"
+                              title="הוסף נקודות"
+                            >
+                              ➕
+                            </button>
+                            <button
+                              onClick={() => openPointsModal(user, 'subtract')}
+                              className="points-button subtract"
+                              title="הורד נקודות"
+                            >
+                              ➖
+                            </button>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -379,9 +453,19 @@ const OrganizationData = ({ organization, onLogout }) => {
             </div>
 
             <div className="stats">
-              <p>סה"כ משתמשים: {users.length}</p>
-              <p>משתמשים מאושרים: {users.filter(u => u.is_authorized).length}</p>
-              <p>משתמשים לא מאושרים: {users.filter(u => !u.is_authorized).length}</p>
+              <div className="stats-section">
+                <h4>📊 סטטיסטיקות כלליות</h4>
+                <p>סה"כ משתמשים: {users.length}</p>
+                <p>משתמשים מאושרים: {users.filter(u => u.is_authorized).length}</p>
+                <p>משתמשים לא מאושרים: {users.filter(u => !u.is_authorized).length}</p>
+              </div>
+              <div className="stats-section">
+                <h4>🏆 סטטיסטיקות נקודות</h4>
+                <p>סה"כ נקודות בארגון: {users.reduce((sum, u) => sum + (u.points || 0), 0)}</p>
+                <p>ממוצע נקודות למשתמש: {users.length > 0 ? (users.reduce((sum, u) => sum + (u.points || 0), 0) / users.length).toFixed(1) : '0.0'}</p>
+                <p>המשתמש עם הכי הרבה נקודות: {users.length > 0 ? Math.max(...users.map(u => u.points || 0)) : 0}</p>
+                <p>משתמשים עם נקודות: {users.filter(u => (u.points || 0) > 0).length}</p>
+              </div>
             </div>
           </div>
         )}
@@ -438,6 +522,60 @@ const OrganizationData = ({ organization, onLogout }) => {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* מודל ניהול נקודות */}
+        {pointsModal.isOpen && (
+          <div className="modal-overlay" onClick={closePointsModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>
+                  {pointsModal.action === 'add' ? '➕ הוספת נקודות' : '➖ הורדת נקודות'}
+                </h3>
+                <button className="close-button" onClick={closePointsModal}>×</button>
+              </div>
+              <div className="modal-body">
+                <div className="user-info">
+                  <p><strong>משתמש:</strong> {pointsModal.user?.full_name || pointsModal.user?.username}</p>
+                  <p><strong>נקודות נוכחיות:</strong> {pointsModal.user?.points || 0}</p>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="points-input">
+                    כמות נקודות {pointsModal.action === 'add' ? 'להוספה:' : 'להורדה:'}
+                  </label>
+                  <input
+                    type="number"
+                    id="points-input"
+                    min="1"
+                    value={pointsModal.points}
+                    onChange={(e) => setPointsModal(prev => ({
+                      ...prev,
+                      points: Math.max(1, parseInt(e.target.value) || 0)
+                    }))}
+                    className="points-input"
+                  />
+                </div>
+                <div className="preview">
+                  <p>
+                    <strong>תוצאה:</strong> {pointsModal.user?.points || 0}
+                    {pointsModal.action === 'add' ? ' + ' : ' - '}
+                    {pointsModal.points} = {pointsModal.action === 'add'
+                      ? (pointsModal.user?.points || 0) + pointsModal.points
+                      : Math.max(0, (pointsModal.user?.points || 0) - pointsModal.points)
+                    } נקודות
+                  </p>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="cancel-button" onClick={closePointsModal}>
+                  ביטול
+                </button>
+                <button className="confirm-button" onClick={handlePointsUpdate}>
+                  {pointsModal.action === 'add' ? 'הוסף נקודות' : 'הורד נקודות'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
