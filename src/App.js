@@ -140,18 +140,33 @@ const OrganizationData = ({ organization, onLogout }) => {
         const allUsers = response.data.data || [];
         console.log("All users array:", allUsers); // לוג לבדיקה
         
-        // סינון משתמשים לפי הארגון שנבחר - בדיקה נכונה של organizationId._id
+        // סינון משתמשים לפי הארגון שנבחר
         const filteredUsers = allUsers.filter(user => {
-          console.log("Checking user:", user.full_name, "with organizationId:", user.organizationId); // לוג לבדיקה
+          console.log("Checking user:", user.full_name, "with organization:", user.organization); // לוג לבדיקה
           
+          // בדיקה אם המשתמש מקושר לארגון דרך organization.name (הדרך הנפוצה ביותר)
+          if (user.organization && user.organization.name === organization.name) {
+            console.log("User matched by organization.name:", user.full_name); // לוג לבדיקה
+            return true;
+          }
+          // בדיקה אם המשתמש מקושר לארגון דרך organization._id
+          if (user.organization && user.organization._id === organization._id) {
+            console.log("User matched by organization._id:", user.full_name); // לוג לבדיקה
+            return true;
+          }
           // בדיקה אם המשתמש מקושר לארגון דרך organizationId._id
           if (user.organizationId && user.organizationId._id === organization._id) {
             console.log("User matched by organizationId._id:", user.full_name); // לוג לבדיקה
             return true;
           }
-          // בדיקה גם דרך השדה organization (למקרה שיש גם שם)
+          // בדיקה אם המשתמש מקושר לארגון דרך organizationId.name
+          if (user.organizationId && user.organizationId.name === organization.name) {
+            console.log("User matched by organizationId.name:", user.full_name); // לוג לבדיקה
+            return true;
+          }
+          // בדיקה גם דרך השדה organization (string - מזהה בלבד)
           if (user.organization === organization._id) {
-            console.log("User matched by organization field:", user.full_name); // לוג לבדיקה
+            console.log("User matched by organization string field:", user.full_name); // לוג לבדיקה
             return true;
           }
           console.log("User NOT matched:", user.full_name); // לוג לבדיקה
