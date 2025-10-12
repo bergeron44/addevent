@@ -281,31 +281,35 @@ const OrganizationData = ({ organization, onLogout }) => {
       }
 
       const currentPoints = user.points || 0;
-      let newPoints;
+      let pointsDelta; // השינוי שנשלח לשרת
+      let newPoints; // הערך החדש לתצוגה מקומית
 
       if (action === 'add') {
+        pointsDelta = points; // מספר חיובי להוספה
         newPoints = currentPoints + points;
       } else if (action === 'subtract') {
+        pointsDelta = -points; // מספר שלילי להורדה
         newPoints = Math.max(0, currentPoints - points); // לא יכול להגיע למספר שלילי
       } else {
         alert("פעולה לא תקינה");
         return;
       }
 
-      // עדכון מקומי ראשית
+      // עדכון בשרת תחילה
+      const response = await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${user._id}/points`, {
+        points: pointsDelta // ← שולחים את השינוי (דלתא), לא את הסכום הסופי
+      });
+
+      // עדכון מקומי עם הנתונים מהשרת
+      const updatedUser = response.data.data;
       setUsers(users.map(u =>
         u._id === user._id
-          ? { ...u, points: newPoints }
+          ? { ...u, points: updatedUser.points }
           : u
       ));
 
-      // עדכון בשרת
-      await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${user._id}/points`, {
-        points: newPoints
-      });
-
       closePointsModal();
-      alert(`נקודות המשתמש עודכנו בהצלחה!`);
+      alert(`נקודות המשתמש עודכנו בהצלחה! נקודות חדשות: ${updatedUser.points}`);
 
     } catch (error) {
       console.error("Error updating user points:", error);
