@@ -262,6 +262,7 @@ const OrganizationData = ({ organization, onLogout }) => {
 
       // ניסיון לעדכן בשרת - משתמש ב-authorize לאישור וב-ban לביטול
       try {
+        console.log(newStatus)
         if (newStatus) {
           // אם מאשרים - תקרא ל-authorize
           await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`);
@@ -302,7 +303,7 @@ const OrganizationData = ({ organization, onLogout }) => {
 
       // ניסיון לעדכן בשרת
       try {
-        await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`);
+        await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`);
       } catch (serverError) {
         console.error("Server update failed, but local update succeeded:", serverError);
       }
