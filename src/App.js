@@ -139,9 +139,16 @@ const OrganizationData = ({ organization, onLogout }) => {
         // המשתמשים נמצאים ב-response.data.data ולא ב-response.data
         const allUsers = response.data.data || [];
         console.log("All users array:", allUsers); // לוג לבדיקה
+        console.log("Current organization details:", organization); // לוג לבדיקה
         
         // סינון משתמשים לפי הארגון שנבחר
         const filteredUsers = allUsers.filter(user => {
+          // דילוג על מסמכים ללא שם או עם שם ריק
+          if (!user.full_name || user.full_name.trim() === '') {
+            console.log("Skipping user with empty/undefined name:", user._id);
+            return false;
+          }
+          
           console.log("Checking user:", user.full_name, "with organization:", user.organization); // לוג לבדיקה
           
           // בדיקה אם המשתמש מקושר לארגון דרך organization.name (הדרך הנפוצה ביותר)
@@ -173,6 +180,7 @@ const OrganizationData = ({ organization, onLogout }) => {
           return false;
         });
         
+        console.log("Total users from API:", allUsers.length); // לוג לבדיקה
         console.log("Filtered users for organization:", filteredUsers); // לוג לבדיקה
         console.log("Number of filtered users:", filteredUsers.length); // לוג לבדיקה
         
@@ -200,7 +208,7 @@ const OrganizationData = ({ organization, onLogout }) => {
       }
     };
     fetchUsers();
-  }, [organization._id]);
+  }, [organization._id, organization.name]);
 
   // קבלת ביקורות הארגון
   useEffect(() => {
@@ -252,6 +260,46 @@ const OrganizationData = ({ organization, onLogout }) => {
         }
       }
 
+      // ניסיון לעדכן בשרת - משתמש ב-authorize לאישור וב-ban לביטול
+      try {
+        if (newStatus) {
+          // אם מאשרים - תקרא ל-authorize
+          await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`);
+        } else {
+          // אם מבטלים אישור - תקרא ל-ban
+          await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`);
+        }
+      } catch (serverError) {
+        console.error("Server update failed, but local update succeeded:", serverError);
+      }
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      alert("שגיאה בעדכון סטטוס המשתמש");
+    }
+  };
+
+  const handleRejectUser = async (userId) => {
+    try {
+      const user = users.find(u => u._id === userId);
+
+      // עדכון מקומי ראשית - לא מאושר
+      setUsers(users.map(user =>
+        user._id === userId
+          ? { ...user, is_authorized: false }
+          : user
+      ));
+
+      // שלח מייל דחייה
+      if (user.email) {
+        try {
+          await sendRejectionEmail(user.email, user.full_name || user.username, organization.name);
+          console.log('מייל דחייה נשלח בהצלחה!');
+        } catch (emailError) {
+          console.error('שגיאה בשליחת מייל דחייה:', emailError);
+          // לא נעצור את התהליך אם המייל נכשל
+        }
+      }
+
       // ניסיון לעדכן בשרת
       try {
         await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`);
@@ -259,8 +307,8 @@ const OrganizationData = ({ organization, onLogout }) => {
         console.error("Server update failed, but local update succeeded:", serverError);
       }
     } catch (error) {
-      console.error("Error updating user status:", error);
-      alert("שגיאה בעדכון סטטוס המשתמש");
+      console.error("Error rejecting user:", error);
+      alert("שגיאה בדחיית המשתמש");
     }
   };
 
@@ -336,6 +384,31 @@ const OrganizationData = ({ organization, onLogout }) => {
       
     } catch (error) {
       console.error('שגיאה בשליחת מייל:', error);
+      throw error;
+    }
+  };
+
+  // פונקציה לשליחת מייל דחייה
+  const sendRejectionEmail = async (userEmail, userName, organizationName) => {
+    try {
+      // תבנית המייל לדחייה
+      const templateParams = {
+        to_email: userEmail,
+        to_name: userName,
+        organization_name: organizationName,
+        rejection_date: new Date().toLocaleDateString('he-IL')
+      };
+      
+      // שליחה דרך EmailJS עם המפתחות החדשים שסיפקת
+      await emailjs.send('service_grx9y87', 'template_bddg4ud', templateParams, 'TuCOVDloC0qDsiDXO');
+      
+      // הצגת הודעה למשתמש שהמייל נשלח (באדום)
+      const message = `מייל דחייה נשלח בהצלחה ל-${userEmail}`;
+      alert(message);
+      console.log('🔴 ' + message);
+      
+    } catch (error) {
+      console.error('שגיאה בשליחת מייל דחייה:', error);
       throw error;
     }
   };
@@ -441,12 +514,30 @@ const OrganizationData = ({ organization, onLogout }) => {
                       </td>
                       <td>
                         <div className="actions-container">
-                          <button
-                            onClick={() => handleAuthorizeToggle(user._id, user.is_authorized)}
-                            className={`toggle-button ${user.is_authorized ? "deauthorize" : "authorize"}`}
-                          >
-                            {user.is_authorized ? "ביטול אישור" : "אשר"}
-                          </button>
+                          {!user.is_authorized && (
+                            <>
+                              <button
+                                onClick={() => handleAuthorizeToggle(user._id, user.is_authorized)}
+                                className="toggle-button authorize"
+                              >
+                                אשר
+                              </button>
+                              <button
+                                onClick={() => handleRejectUser(user._id)}
+                                className="toggle-button reject"
+                              >
+                                אל תאשר
+                              </button>
+                            </>
+                          )}
+                          {user.is_authorized && (
+                            <button
+                              onClick={() => handleAuthorizeToggle(user._id, user.is_authorized)}
+                              className="toggle-button deauthorize"
+                            >
+                              ביטול אישור
+                            </button>
+                          )}
                           <div className="points-actions">
                             <button
                               onClick={() => openPointsModal(user, 'add')}

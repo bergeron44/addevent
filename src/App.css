@@ -340,6 +340,19 @@ body {
   transform: translateY(-1px);
 }
 
+.toggle-button.reject {
+  background: #dc3545;
+  color: white;
+  border: 1px solid #dc3545;
+}
+
+.toggle-button.reject:hover {
+  background: #c82333;
+  border-color: #bd2130;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
 .stats {
   display: flex;
   justify-content: space-around;
@@ -791,8 +804,10 @@ body {
 
 .actions-container {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
