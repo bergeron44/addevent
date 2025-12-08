@@ -313,6 +313,52 @@ const OrganizationData = ({ organization, onLogout }) => {
     }
   };
 
+  // פונקציה לתרגום תפקידים לעברית
+  const getRoleLabel = (role) => {
+    const roleLabels = {
+      'user': 'משתמש',
+      'admin': 'מנהל',
+      'superadmin': 'מנהל על',
+      'business_owner': 'בעל עסק'
+    };
+    return roleLabels[role] || 'משתמש';
+  };
+
+  // פונקציה לעדכון תפקיד המשתמש
+  const handleRoleUpdate = async (userId, newRole) => {
+    try {
+      // עדכון מקומי ראשית
+      setUsers(users.map(user =>
+        user._id === userId
+          ? { ...user, role: newRole }
+          : user
+      ));
+
+      // עדכון בשרת
+      try {
+        await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/role`, {
+          role: newRole
+        });
+        console.log(`תפקיד המשתמש עודכן בהצלחה ל-${getRoleLabel(newRole)}`);
+      } catch (serverError) {
+        console.error("Server update failed, but local update succeeded:", serverError);
+        alert("שגיאה בעדכון התפקיד בשרת, אך העדכון המקומי בוצע");
+        // החזרת המצב הקודם במקרה של שגיאה
+        const user = users.find(u => u._id === userId);
+        if (user) {
+          setUsers(users.map(u =>
+            u._id === userId
+              ? { ...u, role: user.role }
+              : u
+          ));
+        }
+      }
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      alert("שגיאה בעדכון תפקיד המשתמש");
+    }
+  };
+
   const openPointsModal = (user, action) => {
     setPointsModal({ isOpen: true, user, action, points: 1 });
   };
@@ -493,6 +539,7 @@ const OrganizationData = ({ organization, onLogout }) => {
                     <th>אימייל</th>
                     <th>טלפון</th>
                     <th>נקודות</th>
+                    <th>תפקיד</th>
                     <th>סטטוס אישור</th>
                     <th>פעולות</th>
                   </tr>
@@ -507,6 +554,18 @@ const OrganizationData = ({ organization, onLogout }) => {
                         <span className="points-display">
                           {user.points || 0} נקודות
                         </span>
+                      </td>
+                      <td>
+                        <select
+                          value={user.role || 'user'}
+                          onChange={(e) => handleRoleUpdate(user._id, e.target.value)}
+                          className="role-select"
+                        >
+                          <option value="user">משתמש</option>
+                          <option value="admin">מנהל</option>
+                          <option value="superadmin">מנהל על</option>
+                          <option value="business_owner">בעל עסק</option>
+                        </select>
                       </td>
                       <td>
                         <span className={`status-badge ${user.is_authorized ? "authorized" : "not-authorized"}`}>
