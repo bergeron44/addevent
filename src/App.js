@@ -132,7 +132,9 @@ const OrganizationData = ({ organization, onLogout }) => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get("https://bangyourhead-server.onrender.com/api/usernews");
+        const response = await axios.get("https://bangyourhead-server.onrender.com/api/usernews", {
+          headers: { 'x-service-code': '8263867' }
+        });
         console.log("All users from API:", response.data); // לוג לבדיקה
         console.log("Current organization ID:", organization._id); // לוג לבדיקה
         
@@ -214,7 +216,9 @@ const OrganizationData = ({ organization, onLogout }) => {
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const response = await axios.get(`https://bangyourhead-server.onrender.com/api/reviews/organization/${organization._id}`);
+        const response = await axios.get(`https://bangyourhead-server.onrender.com/api/reviews/organization/${organization._id}`, {
+          headers: { 'x-service-code': '8263867' }
+        });
         console.log("Reviews from API:", response.data);
         
         // הביקורות נמצאות ב-response.data.message ולא ב-response.data.data
@@ -265,10 +269,14 @@ const OrganizationData = ({ organization, onLogout }) => {
         console.log(newStatus)
         if (newStatus) {
           // אם מאשרים - תקרא ל-authorize
-          await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`);
+          await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`, {}, {
+            headers: { 'x-service-code': '8263867' }
+          });
         } else {
           // אם מבטלים אישור - תקרא ל-ban
-          await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`);
+          await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`, {}, {
+            headers: { 'x-service-code': '8263867' }
+          });
         }
       } catch (serverError) {
         console.error("Server update failed, but local update succeeded:", serverError);
@@ -303,7 +311,9 @@ const OrganizationData = ({ organization, onLogout }) => {
 
       // ניסיון לעדכן בשרת
       try {
-        await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`);
+        await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`, {}, {
+          headers: { 'x-service-code': '8263867' }
+        });
       } catch (serverError) {
         console.error("Server update failed, but local update succeeded:", serverError);
       }
@@ -338,6 +348,8 @@ const OrganizationData = ({ organization, onLogout }) => {
       try {
         await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/role`, {
           role: newRole
+        }, {
+          headers: { 'x-service-code': '8263867' }
         });
         console.log(`תפקיד המשתמש עודכן בהצלחה ל-${getRoleLabel(newRole)}`);
       } catch (serverError) {
@@ -393,6 +405,8 @@ const OrganizationData = ({ organization, onLogout }) => {
       // עדכון בשרת תחילה
       const response = await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${user._id}/points`, {
         points: pointsDelta // ← שולחים את השינוי (דלתא), לא את הסכום הסופי
+      }, {
+        headers: { 'x-service-code': '8263867' }
       });
 
       // עדכון מקומי עם הנתונים מהשרת
