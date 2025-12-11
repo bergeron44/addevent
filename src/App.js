@@ -267,15 +267,16 @@ const OrganizationData = ({ organization, onLogout }) => {
       // ניסיון לעדכן בשרת - משתמש ב-authorize לאישור וב-ban לביטול
       try {
         console.log(newStatus)
+        const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
         if (newStatus) {
           // אם מאשרים - תקרא ל-authorize
           await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`, {}, {
-            headers: { 'x-service-code': '8263867' }
+            headers: { 'Authorization': `Bearer ${serviceToken}` }
           });
         } else {
           // אם מבטלים אישור - תקרא ל-ban
           await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`, {}, {
-            headers: { 'x-service-code': '8263867' }
+            headers: { 'Authorization': `Bearer ${serviceToken}` }
           });
         }
       } catch (serverError) {
@@ -311,8 +312,9 @@ const OrganizationData = ({ organization, onLogout }) => {
 
       // ניסיון לעדכן בשרת
       try {
+        const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
         await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`, {}, {
-          headers: { 'x-service-code': '8263867' }
+          headers: { 'Authorization': `Bearer ${serviceToken}` }
         });
       } catch (serverError) {
         console.error("Server update failed, but local update succeeded:", serverError);
