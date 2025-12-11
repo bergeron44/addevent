@@ -133,6 +133,11 @@ const OrganizationData = ({ organization, onLogout }) => {
     const fetchUsers = async () => {
       try {
         const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
+        console.log('🔐 Token check (users GET):', process.env.REACT_APP_MAP4U_TOKEN ? `${process.env.REACT_APP_MAP4U_TOKEN.substring(0, 20)}...` : 'undefined/null - using fallback');
+        console.log('📤 Fetch users headers:', {
+          'x-service-code': '8263867',
+          'Authorization': `Bearer ${serviceToken ? serviceToken.substring(0, 30) + '...' : 'undefined'}`
+        });
         const response = await axios.get("https://bangyourhead-server.onrender.com/api/usernews", {
           headers: { 
             'x-service-code': '8263867',
@@ -221,6 +226,11 @@ const OrganizationData = ({ organization, onLogout }) => {
     const fetchReviews = async () => {
       try {
         const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
+        console.log('🔐 Token check (reviews GET):', process.env.REACT_APP_MAP4U_TOKEN ? `${process.env.REACT_APP_MAP4U_TOKEN.substring(0, 20)}...` : 'undefined/null - using fallback');
+        console.log('📤 Fetch reviews headers:', {
+          'x-service-code': '8263867',
+          'Authorization': `Bearer ${serviceToken ? serviceToken.substring(0, 30) + '...' : 'undefined'}`
+        });
         const response = await axios.get(`https://bangyourhead-server.onrender.com/api/reviews/organization/${organization._id}`, {
           headers: { 
             'x-service-code': '8263867',
