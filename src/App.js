@@ -268,13 +268,17 @@ const OrganizationData = ({ organization, onLogout }) => {
       try {
         console.log(newStatus)
         const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
+        console.log('🔐 Token check:', process.env.REACT_APP_MAP4U_TOKEN ? `${process.env.REACT_APP_MAP4U_TOKEN.substring(0, 20)}...` : 'undefined/null - using fallback');
+        console.log('🔐 Service Token being used:', serviceToken ? `${serviceToken.substring(0, 20)}...` : 'undefined');
         if (newStatus) {
           // אם מאשרים - תקרא ל-authorize
+          console.log('📤 Sending authorize request with headers:', { 'Authorization': `Bearer ${serviceToken ? serviceToken.substring(0, 30) + '...' : 'undefined'}` });
           await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/authorize`, {}, {
             headers: { 'Authorization': `Bearer ${serviceToken}` }
           });
         } else {
           // אם מבטלים אישור - תקרא ל-ban
+          console.log('📤 Sending ban request with headers:', { 'Authorization': `Bearer ${serviceToken ? serviceToken.substring(0, 30) + '...' : 'undefined'}` });
           await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`, {}, {
             headers: { 'Authorization': `Bearer ${serviceToken}` }
           });
@@ -313,6 +317,9 @@ const OrganizationData = ({ organization, onLogout }) => {
       // ניסיון לעדכן בשרת
       try {
         const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
+        console.log('🔐 Token check (reject):', process.env.REACT_APP_MAP4U_TOKEN ? `${process.env.REACT_APP_MAP4U_TOKEN.substring(0, 20)}...` : 'undefined/null - using fallback');
+        console.log('🔐 Service Token being used (reject):', serviceToken ? `${serviceToken.substring(0, 20)}...` : 'undefined');
+        console.log('📤 Sending ban request (reject) with headers:', { 'Authorization': `Bearer ${serviceToken ? serviceToken.substring(0, 30) + '...' : 'undefined'}` });
         await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/ban`, {}, {
           headers: { 'Authorization': `Bearer ${serviceToken}` }
         });
