@@ -132,8 +132,12 @@ const OrganizationData = ({ organization, onLogout }) => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
+        const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
         const response = await axios.get("https://bangyourhead-server.onrender.com/api/usernews", {
-          headers: { 'x-service-code': '8263867' }
+          headers: { 
+            'x-service-code': '8263867',
+            'Authorization': `Bearer ${serviceToken}`
+          }
         });
         console.log("All users from API:", response.data); // לוג לבדיקה
         console.log("Current organization ID:", organization._id); // לוג לבדיקה
@@ -216,8 +220,12 @@ const OrganizationData = ({ organization, onLogout }) => {
   useEffect(() => {
     const fetchReviews = async () => {
       try {
+        const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
         const response = await axios.get(`https://bangyourhead-server.onrender.com/api/reviews/organization/${organization._id}`, {
-          headers: { 'x-service-code': '8263867' }
+          headers: { 
+            'x-service-code': '8263867',
+            'Authorization': `Bearer ${serviceToken}`
+          }
         });
         console.log("Reviews from API:", response.data);
         
@@ -355,10 +363,14 @@ const OrganizationData = ({ organization, onLogout }) => {
 
       // עדכון בשרת
       try {
+        const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
         await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${userId}/role`, {
           role: newRole
         }, {
-          headers: { 'x-service-code': '8263867' }
+          headers: { 
+            'x-service-code': '8263867',
+            'Authorization': `Bearer ${serviceToken}`
+          }
         });
         console.log(`תפקיד המשתמש עודכן בהצלחה ל-${getRoleLabel(newRole)}`);
       } catch (serverError) {
@@ -412,10 +424,14 @@ const OrganizationData = ({ organization, onLogout }) => {
       }
 
       // עדכון בשרת תחילה
+      const serviceToken = process.env.REACT_APP_MAP4U_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInNjb3BlcyI6WyJhZG1pbjp1c2VyczphdXRob3JpemUiLCJhZG1pbjp1c2VyczpiYW4iXSwiYXVkIjoiYWRkZXZlbnQub25yZW5kZXIuY29tIiwiaWF0IjoxNzY1NDg2MTM2LCJleHAiOjE3OTcwMjIxMzZ9.Kz_UZQD-uF4fcJVu6T-NvxTsQHl2MnMRYICDVrVSaGM';
       const response = await axios.patch(`https://bangyourhead-server.onrender.com/api/usernews/${user._id}/points`, {
         points: pointsDelta // ← שולחים את השינוי (דלתא), לא את הסכום הסופי
       }, {
-        headers: { 'x-service-code': '8263867' }
+        headers: { 
+          'x-service-code': '8263867',
+          'Authorization': `Bearer ${serviceToken}`
+        }
       });
 
       // עדכון מקומי עם הנתונים מהשרת
