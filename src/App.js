@@ -473,7 +473,7 @@ const OrganizationData = ({ organization, onLogout }) => {
       };
       
       // שליחה דרך EmailJS עם המפתחות האמיתיים
-      await emailjs.send('service_5242r1b', 'template_z1vwxve', templateParams, '4TqCN9vQEhk_heUkz');
+      await emailjs.send('service_8lbirmd', 'template_z1vwxve', templateParams, '4TqCN9vQEhk_heUkz');
       
       // הצגת הודעה למשתמש שהמייל נשלח
       alert(`מייל אישור נשלח בהצלחה ל-${userEmail}`);
@@ -496,7 +496,7 @@ const OrganizationData = ({ organization, onLogout }) => {
       };
       
       // שליחה דרך EmailJS עם המפתחות החדשים שסיפקת
-      await emailjs.send('service_5242r1b', 'template_bddg4ud', templateParams, 'TuCOVDloC0qDsiDXO');
+      await emailjs.send('service_grx9y87', 'template_bddg4ud', templateParams, 'TuCOVDloC0qDsiDXO');
       
       // הצגת הודעה למשתמש שהמייל נשלח (באדום)
       const message = `מייל דחייה נשלח בהצלחה ל-${userEmail}`;
