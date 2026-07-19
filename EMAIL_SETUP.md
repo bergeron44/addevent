@@ -45,21 +45,28 @@ EmailJS הוא שירות חינמי שמאפשר לשלוח מיילים ישי
 - לחץ על "Account" -> "API Keys"
 - העתק את ה-Public Key
 
-### 5. עדכון הקוד
-בקובץ `src/App.js`, מצא את השורה הזו:
-```javascript
-// await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams, 'YOUR_USER_ID');
+### 5. עדכון הקוד באמצעות משתני סביבה (מומלץ)
+
+**יצירת קובץ .env:**
+צור קובץ `.env` בתיקיית הפרויקט (באותה רמה כמו `package.json`) והוסף את המפתחות הבאים:
+
+```env
+REACT_APP_EMAILJS_SERVICE_ID=your_service_id_here
+REACT_APP_EMAILJS_USER_ID=your_user_id_here
+REACT_APP_EMAILJS_APPROVAL_TEMPLATE_ID=your_approval_template_id_here
+REACT_APP_EMAILJS_REJECTION_TEMPLATE_ID=your_rejection_template_id_here
 ```
 
-והחלף אותה ב:
-```javascript
-await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams, 'YOUR_USER_ID');
-```
+**החלף את:**
+- `your_service_id_here` - עם ה-Service ID שקיבלת (לדוגמה: `service_xxxxx`)
+- `your_user_id_here` - עם ה-Public Key שקיבלת (לדוגמה: `xxxxxxxxxxxxx`)
+- `your_approval_template_id_here` - עם ה-Template ID למייל אישור (לדוגמה: `template_xxxxx`)
+- `your_rejection_template_id_here` - עם ה-Template ID למייל דחייה (לדוגמה: `template_xxxxx`)
 
-החלף את:
-- `YOUR_SERVICE_ID` - עם ה-Service ID שקיבלת
-- `YOUR_TEMPLATE_ID` - עם ה-Template ID שקיבלת  
-- `YOUR_USER_ID` - עם ה-Public Key שקיבלת
+**⚠️ חשוב:**
+- הקובץ `.env` כבר קיים בפרויקט - עדכן אותו עם הערכים הנכונים
+- לאחר עדכון הקובץ, הפעל מחדש את השרת (`npm start`)
+- הקובץ `.env` לא נשמר ב-Git (מופיע ב-.gitignore) כדי לשמור על אבטחה
 
 ### 6. בדיקה
 - הרץ את הפרויקט
@@ -85,9 +92,34 @@ support_email: 'support@map4u.com'
 - מומלץ לבדוק את המיילים לפני שליחה לפרודקשן
 
 ## 🆘 פתרון בעיות:
+
+### שגיאה: "The service ID not found"
+**הבעיה:** ה-Service ID לא נמצא בחשבון EmailJS שלך.
+
+**פתרון:**
+1. היכנס ל-EmailJS Dashboard: https://dashboard.emailjs.com/admin
+2. בדוק את ה-Service ID שלך תחת "Email Services"
+3. אם אין לך Service, צור אחד חדש:
+   - לחץ על "Add New Service"
+   - בחר את ספק המייל שלך (Gmail, Outlook, וכו')
+   - התחבר לחשבון המייל שלך
+   - העתק את ה-Service ID החדש
+4. עדכן את הקובץ `.env` עם ה-Service ID הנכון:
+   ```env
+   REACT_APP_EMAILJS_SERVICE_ID=service_xxxxx
+   ```
+5. הפעל מחדש את השרת (`npm start`)
+
+### שגיאות אחרות:
 אם המיילים לא נשלחים:
-1. בדוק שה-Service ID נכון
-2. בדוק שה-Template ID נכון
-3. בדוק שה-Public Key נכון
-4. בדוק את ה-console לשגיאות
-5. ודא שהמייל שלך מאושר ב-EmailJS
+1. ✅ בדוק שה-Service ID נכון ב-`.env`
+2. ✅ בדוק שה-Template ID נכון ב-`.env`
+3. ✅ בדוק שה-Public Key (User ID) נכון ב-`.env`
+4. ✅ בדוק את ה-console לשגיאות
+5. ✅ ודא שהמייל שלך מאושר ב-EmailJS
+6. ✅ ודא שהשרת הופעל מחדש לאחר עדכון `.env`
+7. ✅ בדוק שהתבניות ב-EmailJS מכילות את המשתנים הנכונים:
+   - `{{to_email}}`
+   - `{{to_name}}`
+   - `{{organization_name}}`
+   - `{{approval_date}}` או `{{rejection_date}}`
