@@ -47,10 +47,13 @@ require('./Notification-routes')(app);
 ב-Render Dashboard של השרת → **Environment** → הוסף:
 
 ```
-BREVO_API_KEY=xkeysib-...            ← המפתח משלב 1
-BREVO_SENDER_EMAIL=your@email.com    ← הכתובת שאימתת בשלב 1
-BREVO_SENDER_NAME=Map4U              ← השם שיוצג לנמענים
+BREVO_API_KEY=xkeysib-...              ← המפתח משלב 1
+BREVO_SENDER_EMAIL=map4uil@gmail.com   ← השולח היחיד של המערכת (חייב אימות ב-Brevo!)
+BREVO_SENDER_NAME=Map4U                ← השם שיוצג לנמענים
 ```
+
+**הערה:** הקוד תמיד שולח עם ה-sender הזה - גם כשמשתמשים בטמפלייט מהדשבורד
+(ה-API דורס את השולח שמוגדר בטמפלייט). כך כל המיילים יוצאים מכתובת אחת ויחידה.
 
 (לבדיקה מקומית: להוסיף אותם גם ל-.env של השרת)
 

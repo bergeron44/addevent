@@ -23,24 +23,31 @@ const sendBrevoEmail = ({ to, toName, subject, htmlContent, templateId, params }
       return reject(new Error('BREVO_API_KEY חסר במשתני הסביבה'));
     }
 
+    if (!senderEmail) {
+      return reject(new Error('BREVO_SENDER_EMAIL חסר במשתני הסביבה'));
+    }
+
+    // השולח מוגדר תמיד מהקוד (BREVO_SENDER_EMAIL) - גם בשליחה עם טמפלייט.
+    // לפי Brevo, sender בבקשת ה-API דורס את השולח שמוגדר בטמפלייט, כך שכל
+    // המיילים יוצאים מכתובת אחת ויחידה בלי תלות בהגדרות הטמפלייטים.
+    const sender = {
+      name: process.env.BREVO_SENDER_NAME || 'Map4U',
+      email: senderEmail
+    };
+
     let body;
     if (templateId) {
-      // שליחה עם טמפלייט מהדשבורד של Brevo - השולח נלקח מהגדרות הטמפלייט
+      // שליחה עם טמפלייט מהדשבורד של Brevo
       body = {
+        sender,
         to: [{ email: to, name: toName || to }],
         templateId: Number(templateId),
         params: params || {}
       };
     } else {
       // שליחה עם HTML מהקוד
-      if (!senderEmail) {
-        return reject(new Error('BREVO_SENDER_EMAIL חסר במשתני הסביבה'));
-      }
       body = {
-        sender: {
-          name: process.env.BREVO_SENDER_NAME || 'Map4U',
-          email: senderEmail
-        },
+        sender,
         to: [{ email: to, name: toName || to }],
         subject,
         htmlContent
