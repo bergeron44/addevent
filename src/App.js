@@ -682,8 +682,41 @@ const OrganizationData = ({ organization, onLogout }) => {
   const setBusy = (userId, value) =>
     setBusyUserIds(prev => ({ ...prev, [userId]: value }));
 
-  // ===== פונקציות שליחת מייל (EmailJS) =====
+  // ===== שליחת מייל דרך השרת (Brevo) =====
+  // ערוץ השליחה המועדף: POST /api/notifications/email בשרת, שמעביר ל-Brevo
+  // (300 מיילים ביום בחינם). אם ה-endpoint עדיין לא קיים בשרת - החזרה false
+  // והקוד נופל חזרה ל-EmailJS. ראה BREVO_SETUP.md להוראות חיבור השרת.
+  const trySendViaServer = async (type, userEmail, userName, organizationName) => {
+    try {
+      await axios.post(`${API_BASE}/api/notifications/email`, {
+        type,
+        to: userEmail,
+        name: userName,
+        organizationName
+      }, {
+        headers: getAuthHeaders(),
+        timeout: 20000
+      });
+      const emailType = isUniversityEmail(userEmail)
+        ? 'למייל האוניברסיטאי (אין מייל אישי במערכת)'
+        : 'למייל האישי';
+      showToast('success',
+        type === 'approval' ? 'מייל אישור נשלח בהצלחה (דרך השרת)' : 'מייל דחייה נשלח בהצלחה (דרך השרת)',
+        `${emailType}: ${userEmail}`);
+      return true;
+    } catch (error) {
+      console.warn(`שליחה דרך השרת (Brevo) נכשלה - fallback ל-EmailJS:`,
+        error.response?.status, error.response?.data?.message || error.message);
+      return false;
+    }
+  };
+
+  // ===== פונקציות שליחת מייל (Brevo דרך השרת, עם fallback ל-EmailJS) =====
   const sendApprovalEmail = async (userEmail, userName, organizationName) => {
+    // ניסיון ראשון: דרך השרת (Brevo)
+    if (await trySendViaServer('approval', userEmail, userName, organizationName)) return;
+
+    // fallback: EmailJS (מוגבל ל-200 מיילים בחודש)
     try {
       const templateParams = {
         to_email: userEmail,
@@ -720,6 +753,10 @@ const OrganizationData = ({ organization, onLogout }) => {
   };
 
   const sendRejectionEmail = async (userEmail, userName, organizationName) => {
+    // ניסיון ראשון: דרך השרת (Brevo)
+    if (await trySendViaServer('rejection', userEmail, userName, organizationName)) return;
+
+    // fallback: EmailJS (מוגבל ל-200 מיילים בחודש)
     try {
       const templateParams = {
         to_email: userEmail,
