@@ -686,23 +686,25 @@ const OrganizationData = ({ organization, onLogout }) => {
   // ערוץ השליחה המועדף: POST /api/notifications/email בשרת, שמעביר ל-Brevo
   // (300 מיילים ביום בחינם). אם ה-endpoint עדיין לא קיים בשרת - החזרה false
   // והקוד נופל חזרה ל-EmailJS. ראה BREVO_SETUP.md להוראות חיבור השרת.
-  const trySendViaServer = async (type, userEmail, userName, organizationName) => {
+  //
+  // הנמען נקבע בשרת: שולחים userId, והשרת שולף private_email || email ישירות
+  // מה-DB (הפרונט עיוור ל-private_email כי ה-API מוחק אותו ב-stripSensitiveUser).
+  // 'to' נשלח רק כשיש מייל אישי אמיתי שהוזן ידנית - כ-override. לעולם לא שולחים
+  // מייל אוניברסיטאי כ-'to'. חוזה השרת: recipient = to || private_email || email.
+  const trySendViaServer = async (type, user, personalEmail, userName, organizationName) => {
     try {
-      await axios.post(`${API_BASE}/api/notifications/email`, {
-        type,
-        to: userEmail,
-        name: userName,
-        organizationName
-      }, {
+      const payload = { type, userId: user._id, name: userName, organizationName };
+      if (personalEmail) payload.to = personalEmail;
+
+      await axios.post(`${API_BASE}/api/notifications/email`, payload, {
         headers: getAuthHeaders(),
         timeout: 20000
       });
-      const emailType = isUniversityEmail(userEmail)
-        ? 'למייל האוניברסיטאי (אין מייל אישי במערכת)'
-        : 'למייל האישי';
       showToast('success',
         type === 'approval' ? 'מייל אישור נשלח בהצלחה (דרך השרת)' : 'מייל דחייה נשלח בהצלחה (דרך השרת)',
-        `${emailType}: ${userEmail}`);
+        personalEmail
+          ? `למייל האישי: ${personalEmail}`
+          : 'השרת בחר את היעד לפי נתוני המשתמש (מייל אישי אם קיים)');
       return true;
     } catch (error) {
       console.warn(`שליחה דרך השרת (Brevo) נכשלה - fallback ל-EmailJS:`,
@@ -712,11 +714,15 @@ const OrganizationData = ({ organization, onLogout }) => {
   };
 
   // ===== פונקציות שליחת מייל (Brevo דרך השרת, עם fallback ל-EmailJS) =====
-  const sendApprovalEmail = async (userEmail, userName, organizationName) => {
-    // ניסיון ראשון: דרך השרת (Brevo)
-    if (await trySendViaServer('approval', userEmail, userName, organizationName)) return;
+  // personalEmail - המייל האישי שהפרונט מכיר (ידני/לא-אוניברסיטאי), או null.
+  // fallbackEmail - היעד ל-EmailJS בלבד (כולל אוניברסיטאי כמוצא אחרון), כי
+  // ל-EmailJS אין גישה ל-private_email מה-DB.
+  const sendApprovalEmail = async (user, personalEmail, fallbackEmail, userName, organizationName) => {
+    // ניסיון ראשון: דרך השרת (Brevo) - השרת פותר private_email לפי userId
+    if (await trySendViaServer('approval', user, personalEmail, userName, organizationName)) return;
 
     // fallback: EmailJS (מוגבל ל-200 מיילים בחודש)
+    const userEmail = personalEmail || fallbackEmail;
     try {
       const templateParams = {
         to_email: userEmail,
@@ -752,11 +758,12 @@ const OrganizationData = ({ organization, onLogout }) => {
     }
   };
 
-  const sendRejectionEmail = async (userEmail, userName, organizationName) => {
-    // ניסיון ראשון: דרך השרת (Brevo)
-    if (await trySendViaServer('rejection', userEmail, userName, organizationName)) return;
+  const sendRejectionEmail = async (user, personalEmail, fallbackEmail, userName, organizationName) => {
+    // ניסיון ראשון: דרך השרת (Brevo) - השרת פותר private_email לפי userId
+    if (await trySendViaServer('rejection', user, personalEmail, userName, organizationName)) return;
 
     // fallback: EmailJS (מוגבל ל-200 מיילים בחודש)
+    const userEmail = personalEmail || fallbackEmail;
     try {
       const templateParams = {
         to_email: userEmail,
@@ -792,11 +799,17 @@ const OrganizationData = ({ organization, onLogout }) => {
     }
   };
 
-  // כתובת היעד למיילים: מושכים קודם את הרשומה המלאה כדי לקבל את private_email
-  const resolveContactEmail = async (user) => {
+  // יעדי המייל: personalEmail = מייל אישי שהפרונט מכיר (ידני/לא-אוניברסיטאי) או null,
+  // ומשמש כ-override שנשלח לשרת ב-'to'. fallbackEmail כולל אוניברסיטאי כמוצא אחרון,
+  // ומשמש רק ל-EmailJS. הערה: private_email מה-DB לא נשלף כאן - ה-API מוחק אותו,
+  // ולכן הבחירה שלו נעשית בשרת לפי userId.
+  const resolveEmailTargets = async (user) => {
     const full = await ensureFullUser(user._id);
     const merged = full ? { ...user, ...full } : user;
-    return getContactEmail(merged, manualEmails);
+    return {
+      personalEmail: getPersonalEmail(merged, manualEmails),
+      fallbackEmail: getContactEmail(merged, manualEmails)
+    };
   };
 
   // ===== אישור / ביטול אישור =====
@@ -814,10 +827,10 @@ const OrganizationData = ({ organization, onLogout }) => {
 
       // אם המשתמש אושר - שלח מייל אישור למייל האישי (או לאוניברסיטאי אם אין)
       if (newStatus) {
-        const contactEmail = await resolveContactEmail(user);
-        if (contactEmail) {
+        const { personalEmail, fallbackEmail } = await resolveEmailTargets(user);
+        if (personalEmail || fallbackEmail) {
           try {
-            await sendApprovalEmail(contactEmail, user.full_name || user.username, organization.name);
+            await sendApprovalEmail(user, personalEmail, fallbackEmail, user.full_name || user.username, organization.name);
           } catch (emailError) {
             // לא נעצור את התהליך אם המייל נכשל - ההודעה כבר הוצגה ב-toast
           }
@@ -863,11 +876,11 @@ const OrganizationData = ({ organization, onLogout }) => {
         u._id === userId ? { ...u, is_authorized: false } : u
       ));
 
-      // שלח מייל דחייה למייל האישי (או לאוניברסיטאי אם אין)
-      const contactEmail = await resolveContactEmail(user);
-      if (contactEmail) {
+      // שלח מייל דחייה - השרת יבחר מייל אישי לפי userId, אחרת אוניברסיטאי
+      const { personalEmail, fallbackEmail } = await resolveEmailTargets(user);
+      if (personalEmail || fallbackEmail) {
         try {
-          await sendRejectionEmail(contactEmail, user.full_name || user.username, organization.name);
+          await sendRejectionEmail(user, personalEmail, fallbackEmail, user.full_name || user.username, organization.name);
         } catch (emailError) {
           // ההודעה כבר הוצגה ב-toast
         }
