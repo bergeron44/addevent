@@ -803,6 +803,101 @@ select {
   white-space: nowrap;
 }
 
+/* ===== סרגל סינון תאריכים ===== */
+.date-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.06));
+  border: 1px solid rgba(99,102,241,0.18);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.date-filter-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--indigo-600, #4f46e5);
+  white-space: nowrap;
+}
+
+.date-filter-inputs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.date-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+
+.date-input {
+  width: 148px !important;
+  padding: 7px 10px !important;
+  font-size: 13px !important;
+  cursor: pointer;
+  direction: ltr;
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.date-separator {
+  color: var(--gray-400);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.date-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+  animation: fadeInBadge 0.25s ease;
+}
+
+@keyframes fadeInBadge {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.date-clear-btn {
+  font-size: 12px !important;
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  color: var(--gray-500) !important;
+  border: 1px solid var(--gray-300) !important;
+  background: white !important;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.date-clear-btn:hover {
+  background: var(--red-50, #fef2f2) !important;
+  border-color: var(--red-300, #fca5a5) !important;
+  color: var(--red-600, #dc2626) !important;
+}
+
 .table-hint {
   font-size: 13px;
   color: var(--gray-400);

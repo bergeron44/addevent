@@ -571,6 +571,8 @@ const OrganizationData = ({ organization, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date_desc');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]   = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const USERS_PER_PAGE = 25;
 
@@ -1009,6 +1011,24 @@ const OrganizationData = ({ organization, onLogout }) => {
       result = result.filter(u => !u.is_authorized);
     }
 
+    // סינון לפי טווח תאריכי הצטרפות
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter(u => {
+        const joined = new Date(u.created_at || u.createdAt || 0);
+        return joined >= from;
+      });
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter(u => {
+        const joined = new Date(u.created_at || u.createdAt || 0);
+        return joined <= to;
+      });
+    }
+
     if (sortBy === 'points_desc') {
       result.sort((a, b) => (b.points || 0) - (a.points || 0));
     } else if (sortBy === 'name_asc') {
@@ -1018,7 +1038,7 @@ const OrganizationData = ({ organization, onLogout }) => {
     }
 
     return result;
-  }, [users, searchTerm, statusFilter, sortBy, manualEmails, fullUsers]);
+  }, [users, searchTerm, statusFilter, sortBy, dateFrom, dateTo, manualEmails, fullUsers]);
 
   // עימוד
   const totalPages = Math.max(1, Math.ceil(visibleUsers.length / USERS_PER_PAGE));
@@ -1027,7 +1047,7 @@ const OrganizationData = ({ organization, onLogout }) => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, sortBy]);
+  }, [searchTerm, statusFilter, sortBy, dateFrom, dateTo]);
 
   // לחיצה על שורה - פתיחה/סגירה של פאנל הפרטים (מתעלמים מלחיצות על פקדים)
   const handleRowClick = (user, e) => {
@@ -1184,6 +1204,50 @@ const OrganizationData = ({ organization, onLogout }) => {
               <span className="results-count">
                 מציג {pagedUsers.length} מתוך {visibleUsers.length}
               </span>
+            </div>
+
+            {/* סרגל סינון תאריכים */}
+            <div className="date-filter-bar">
+              <span className="date-filter-label">📅 סינון לפי תאריך הצטרפות:</span>
+              <div className="date-filter-inputs">
+                <div className="date-field">
+                  <label htmlFor="date-from">מתאריך</label>
+                  <input
+                    id="date-from"
+                    type="date"
+                    className="form-input date-input"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    max={dateTo || undefined}
+                  />
+                </div>
+                <span className="date-separator">—</span>
+                <div className="date-field">
+                  <label htmlFor="date-to">עד תאריך</label>
+                  <input
+                    id="date-to"
+                    type="date"
+                    className="form-input date-input"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    min={dateFrom || undefined}
+                  />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <>
+                    <span className="date-filter-badge">
+                      {visibleUsers.length} תוצאות
+                    </span>
+                    <button
+                      className="btn btn-ghost date-clear-btn"
+                      onClick={() => { setDateFrom(''); setDateTo(''); }}
+                      title="נקה סינון תאריכים"
+                    >
+                      ✕ נקה
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             <p className="table-hint">💡 לחיצה על שורת משתמש פותחת את כל הפרטים המלאים שלו</p>
