@@ -14,6 +14,10 @@ const {
   approvalEmailHtml,
   rejectionEmailHtml
 } = require('../services/Brevo-service');
+const Usernew = require('../models/Usernew');
+const PushSubscription = require('../models/PushSubscription');
+const pushService = require('../services/pushService');
+const pushMessages = require('../services/pushMessages');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -38,11 +42,14 @@ const EMAIL_TYPES = {
 };
 
 // POST /api/notifications/email
-// body: { type, to, name, organizationName, params? }
+// body: { type, to?, userId?, name, organizationName, params? }
+// - userId (מומלץ): הבקנד שולף את המשתמש ובוחר בעצמו את המייל הרגיל (הפרטי),
+//   כך שהנמען מובטח בצד השרת ולא תלוי בקליינט.
+// - to: כתובת מפורשת. משמשת כשאין userId (למשל מייל לנמען שאינו משתמש במערכת).
 // params - משתנים דינמיים נוספים לטמפלייט (למשל { couponCode: 'WELCOME20' })
 const sendNotificationEmail = async (req, res) => {
   try {
-    const { type, to, name, organizationName, params } = req.body || {};
+    const { type, to, userId, name, organizationName, params } = req.body || {};
 
     const config = EMAIL_TYPES[type];
     if (!config) {
@@ -50,11 +57,31 @@ const sendNotificationEmail = async (req, res) => {
         errorResponse(`type לא מוכר. סוגים נתמכים: ${Object.keys(EMAIL_TYPES).join(', ')}`)
       );
     }
-    if (!to || !EMAIL_REGEX.test(to)) {
-      return res.status(400).json(errorResponse('כתובת מייל (to) לא תקינה'));
+
+    // ===== בחירת נמען: תמיד המייל הרגיל (הפרטי), לא האוניברסיטאי =====
+    // כשמגיע userId, הבקנד מושך את המשתמש ובוחר private_email; נופל ל-email
+    // (האוניברסיטאי) רק אם אין מייל פרטי. בלי userId משתמשים ב-to כפי שהוא.
+    let recipient = to;
+    let recipientName = name;
+    if (userId) {
+      let user;
+      try {
+        user = await Usernew.findById(userId).select('email private_email full_name');
+      } catch {
+        return res.status(400).json(errorResponse('userId לא תקין'));
+      }
+      if (!user) {
+        return res.status(404).json(errorResponse('משתמש לא נמצא עבור userId שסופק'));
+      }
+      recipient = user.private_email || user.email;
+      recipientName = name || user.full_name;
     }
 
-    const safeName = String(name || 'משתמש/ת').slice(0, 100);
+    if (!recipient || !EMAIL_REGEX.test(recipient)) {
+      return res.status(400).json(errorResponse('כתובת מייל נמען לא תקינה (יש לספק userId או to תקין)'));
+    }
+
+    const safeName = String(recipientName || 'משתמש/ת').slice(0, 100);
     const safeOrg = String(organizationName || 'Map4U').slice(0, 100);
     const date = new Date().toLocaleDateString('he-IL');
 
@@ -66,7 +93,7 @@ const sendNotificationEmail = async (req, res) => {
       // בטמפלייט המשתנים זמינים בתור: {{params.name}}, {{params.organizationName}},
       // {{params.date}} + כל מה שמגיע ב-params מהקליינט.
       result = await sendBrevoEmail({
-        to,
+        to: recipient,
         toName: safeName,
         templateId,
         params: {
@@ -79,7 +106,7 @@ const sendNotificationEmail = async (req, res) => {
     } else if (config.fallbackHtml) {
       // אין templateId מוגדר - שולחים את ה-HTML המובנה מהקוד
       result = await sendBrevoEmail({
-        to,
+        to: recipient,
         toName: safeName,
         subject: config.subject(safeOrg),
         htmlContent: config.fallbackHtml(safeName, safeOrg, date)
@@ -90,12 +117,169 @@ const sendNotificationEmail = async (req, res) => {
       );
     }
 
-    console.log(`📧 [NOTIFICATIONS] מייל ${type} נשלח אל ${to} (template: ${templateId || 'built-in'}, messageId: ${result.messageId || 'n/a'})`);
-    res.json(successResponse({ messageId: result.messageId || null, to, type }, 'המייל נשלח בהצלחה'));
+    console.log(`📧 [NOTIFICATIONS] מייל ${type} נשלח אל ${recipient} (template: ${templateId || 'built-in'}, messageId: ${result.messageId || 'n/a'})`);
+    res.json(successResponse({ messageId: result.messageId || null, to: recipient, type }, 'המייל נשלח בהצלחה'));
   } catch (error) {
     console.error('❌ [NOTIFICATIONS] שגיאה בשליחת מייל:', error.message);
     res.status(502).json(errorResponse(`שליחת המייל נכשלה: ${error.message}`));
   }
 };
 
-module.exports = { sendNotificationEmail };
+// ===================================================================
+// ===== Web Push — מנויים והעדפות =====
+// ===================================================================
+
+const MAX_SUBSCRIPTIONS_PER_USER = 10;
+
+// מבנה של PushSubscription.toJSON() מהדפדפן; שדות נוספים (expirationTime) מתעלמים
+const parseSubscription = (body) => {
+  const endpoint = body?.endpoint;
+  const p256dh = body?.keys?.p256dh;
+  const auth = body?.keys?.auth;
+  if (typeof endpoint !== 'string' || endpoint.length > 2048 || !pushService.isAllowedEndpoint(endpoint)) return null;
+  if (typeof p256dh !== 'string' || !p256dh || p256dh.length > 256) return null; // 65 bytes → 87 תווים
+  if (typeof auth !== 'string' || !auth || auth.length > 128) return null;       // 16 bytes → 22 תווים
+  return { endpoint, keys: { p256dh, auth } };
+};
+
+const pushSettingsOf = (user) => ({
+  enabled: user?.pushEnabled === true,
+  categories: {
+    activity: user?.pushCategories?.activity !== false,
+    favorites: user?.pushCategories?.favorites !== false,
+    jointPurchases: user?.pushCategories?.jointPurchases !== false,
+    newContent: user?.pushCategories?.newContent !== false,
+    marketing: user?.pushCategories?.marketing === true
+  }
+});
+
+// GET /api/notifications/push/config  (מחובר)
+const getPushConfig = async (req, res) => {
+  try {
+    if (!pushService.isEnabled()) {
+      return res.status(503).json(errorResponse('התראות Push לא זמינות כרגע'));
+    }
+    const user = await Usernew.findById(req.user.userId).select('pushEnabled pushCategories').lean();
+    res.json(successResponse({ publicKey: pushService.getPublicKey(), ...pushSettingsOf(user) }));
+  } catch (error) {
+    console.error('❌ [PUSH] config failed:', error.message);
+    res.status(500).json(errorResponse('שגיאה בטעינת הגדרות ההתראות'));
+  }
+};
+
+async function dropOverflowDevices(userId) {
+  const overflow = await PushSubscription.find({ user: userId })
+    .sort({ updatedAt: -1 }).skip(MAX_SUBSCRIPTIONS_PER_USER).select('_id').lean();
+  if (overflow.length) await PushSubscription.deleteMany({ _id: { $in: overflow.map((d) => d._id) } });
+}
+
+// POST /api/notifications/push/subscribe  (מחובר)
+// body = subscription.toJSON(). גם מסמן pushEnabled=true (זו ההסכמה).
+const subscribePush = async (req, res) => {
+  try {
+    if (!pushService.isEnabled()) {
+      return res.status(503).json(errorResponse('התראות Push לא זמינות כרגע'));
+    }
+    const parsed = parseSubscription(req.body);
+    if (!parsed) return res.status(400).json(errorResponse('מנוי Push לא תקין'));
+    const userId = req.user.userId;
+
+    // upsert לפי endpoint: אותו דפדפן שנרשם מחשבון אחר עובר אליו
+    const previous = await PushSubscription.findOneAndUpdate(
+      { endpoint: parsed.endpoint },
+      { $set: { user: userId, type: 'web', keys: parsed.keys } },
+      { upsert: true }
+    );
+    const user = await Usernew.findById(userId).select('pushEnabled pushConsentAt').lean();
+    const update = { pushEnabled: true };
+    if (!user?.pushConsentAt || !user?.pushEnabled) update.pushConsentAt = new Date();
+    await Promise.all([
+      dropOverflowDevices(userId),
+      Usernew.updateOne({ _id: userId }, { $set: update })
+    ]);
+    res.status(previous ? 200 : 201).json(successResponse({ subscribed: true }));
+  } catch (error) {
+    console.error('❌ [PUSH] subscribe failed:', error.message);
+    res.status(500).json(errorResponse('שגיאה בהרשמה להתראות'));
+  }
+};
+
+// POST /api/notifications/push/unsubscribe  (מחובר)
+// turnOff:true (toggle באזור האישי) → כבוי לחשבון, מוחקים את כל המכשירים.
+// בלי turnOff (logout) → רק המכשיר הזה, הבחירה של החשבון נשמרת.
+const unsubscribePush = async (req, res) => {
+  try {
+    const endpoint = req.body?.endpoint;
+    const turnOff = req.body?.turnOff === true;
+    const userId = req.user.userId;
+    if (turnOff) {
+      await Promise.all([
+        PushSubscription.deleteMany({ user: userId }),
+        Usernew.updateOne({ _id: userId }, { $set: { pushEnabled: false } })
+      ]);
+    } else {
+      if (typeof endpoint !== 'string' || !endpoint) {
+        return res.status(400).json(errorResponse('endpoint חסר'));
+      }
+      await PushSubscription.deleteOne({ endpoint, user: userId }); // רק אם שייך למבקש
+    }
+    res.status(204).end();
+  } catch (error) {
+    console.error('❌ [PUSH] unsubscribe failed:', error.message);
+    res.status(500).json(errorResponse('שגיאה בביטול ההתראות'));
+  }
+};
+
+// PATCH /api/notifications/push/preferences  (מחובר)
+// body: { categories: { activity?, favorites?, jointPurchases?, marketing? } }
+const updatePushPreferences = async (req, res) => {
+  try {
+    const categories = req.body?.categories;
+    if (!categories || typeof categories !== 'object') {
+      return res.status(400).json(errorResponse('categories חסר'));
+    }
+    const set = {};
+    for (const key of pushService.CATEGORIES) {
+      if (key in categories) {
+        if (typeof categories[key] !== 'boolean') {
+          return res.status(400).json(errorResponse(`ערך לא תקין עבור ${key}`));
+        }
+        set[`pushCategories.${key}`] = categories[key];
+      }
+    }
+    if (!Object.keys(set).length) return res.status(400).json(errorResponse('אין שינוי'));
+    // הסכמה שיווקית נפרדת — נשמר מתי ניתנה (או מאופס כשמבוטלת)
+    if ('marketing' in categories) set.marketingConsentAt = categories.marketing ? new Date() : null;
+
+    const user = await Usernew.findByIdAndUpdate(req.user.userId, { $set: set }, { new: true })
+      .select('pushEnabled pushCategories').lean();
+    if (!user) return res.status(404).json(errorResponse('משתמש לא נמצא'));
+    res.json(successResponse(pushSettingsOf(user), 'ההעדפות נשמרו'));
+  } catch (error) {
+    console.error('❌ [PUSH] preferences failed:', error.message);
+    res.status(500).json(errorResponse('שגיאה בשמירת ההעדפות'));
+  }
+};
+
+// POST /api/notifications/push/test  (אדמין בלבד) — שולח התראת בדיקה לעצמך
+const sendTestPush = async (req, res) => {
+  try {
+    if (!pushService.isEnabled()) {
+      return res.status(503).json(errorResponse('התראות Push לא זמינות כרגע'));
+    }
+    const result = await pushService.sendToDevices(req.user.userId, pushMessages.testMessage());
+    res.json(successResponse(result, result.sent ? 'נשלח' : 'אין מכשירים רשומים לחשבון הזה'));
+  } catch (error) {
+    console.error('❌ [PUSH] test failed:', error.message);
+    res.status(500).json(errorResponse('שגיאה בשליחת התראת בדיקה'));
+  }
+};
+
+module.exports = {
+  sendNotificationEmail,
+  getPushConfig,
+  subscribePush,
+  unsubscribePush,
+  updatePushPreferences,
+  sendTestPush
+};

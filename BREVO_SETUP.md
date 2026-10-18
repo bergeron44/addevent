@@ -36,6 +36,23 @@ cp server-integration/controllers/Notification-controller.js ~/Projects/final-pr
 cp server-integration/routes/Notification-routes.js   ~/Projects/final-project-server/routes/
 ```
 
+### תחרות השיתופים במייל האישור (GIF)
+מייל האישור כולל קטע "המנצחים בתחרות השיתופים זוכים בכרטיס כניסה זוגי חינם לתחילת שנה"
+עם GIF של "ככה מזמינים חבר ל-Map4U". ה-GIF מאוחסן בספריית התמונות של Brevo
+(Content → Images) ומוגדר ב-Render:
+
+```
+EMAIL_SHARE_GIF_URL=https://img.mailinblue.com/11703828/images/content_library/original/6ad1d8d382920ea902eb1253.gif
+```
+
+שימו לב: הכתובת שהממשק של Brevo מציג (`img-thumb...jpeg`) היא תמונה מוקטנת וסטטית. הכתובת
+הנכונה היא `img.mailinblue.com` עם סיומת `.gif`.
+בלי המשתנה, ה-GIF נטען כגיבוי מ-`public/email/share.gif` בשרת (`express.static` ב-`server.js`) -
+פחות אמין: לא נטען כשהשרת ב-Render "ישן", ונחסם ב-Outlook web בגלל Cross-Origin-Resource-Policy.
+
+⚠️ אם מוגדר `BREVO_TEMPLATE_APPROVAL` ב-Render - נשלח הטמפלייט של Brevo ולא ה-HTML מהקוד,
+ואז צריך להוסיף את הקטע הזה גם בטמפלייט בממשק של Brevo.
+
 ## שלב 3: רישום הנתיב ב-routes/index.js של השרת
 הוסף שורה אחת בסוף הרשימה ב-`final-project-server/routes/index.js`:
 
