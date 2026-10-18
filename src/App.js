@@ -543,6 +543,18 @@ const StatCard = ({ icon, label, value, sub, tone = 'default' }) => (
   </div>
 );
 
+// שלבי האישור המרובה כפי שמוצגים בעמודת הסטטוס
+const BULK_STEP_LABELS = {
+  queued: '⏳ בתור',
+  checking: '🔍 בודק בשרת...',
+  authorizing: '🔄 מאשר בשרת...',
+  emailing: '✉️ שולח מייל...',
+  done: '✓ אושר + מייל נשלח',
+  skipped: '⏭ כבר היה מאושר',
+  email_failed: '⚠ אושר, המייל נכשל',
+  failed: '✕ האישור נכשל'
+};
+
 // ===== הדשבורד המרכזי =====
 const OrganizationData = ({ organization, onLogout }) => {
   const [users, setUsers] = useState([]);
@@ -557,6 +569,14 @@ const OrganizationData = ({ organization, onLogout }) => {
   const [usersError, setUsersError] = useState(false);
   const [orgDetailsOpen, setOrgDetailsOpen] = useState(false);
   const [busyUserIds, setBusyUserIds] = useState({}); // משתמשים שפעולה רצה עליהם כרגע
+
+  // ===== אישור מרובה =====
+  const [selectedIds, setSelectedIds] = useState({});   // משתמשים ממתינים שסומנו לאישור
+  const [bulkRun, setBulkRun] = useState(null);         // מצב הריצה (null = אין פאנל)
+  const [bulkStatus, setBulkStatus] = useState({});     // השלב של כל משתמש בריצה
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const bulkStopRef = useRef(false);
+  const bulkRunning = !!bulkRun?.running;
 
   // מטמון רשומות מלאות מהשרת (כולל private_email) לפי מזהה משתמש
   const [fullUsers, setFullUsers] = useState({});
@@ -817,7 +837,7 @@ const OrganizationData = ({ organization, onLogout }) => {
   // ===== אישור / ביטול אישור =====
   const handleAuthorizeToggle = async (userId) => {
     const user = users.find(u => u._id === userId);
-    if (!user || busyUserIds[userId]) return;
+    if (!user || busyUserIds[userId] || bulkRunning) return;
     const newStatus = !user.is_authorized;
     setBusy(userId, true);
 
@@ -867,10 +887,202 @@ const OrganizationData = ({ organization, onLogout }) => {
     }
   };
 
+  // ===== אישור מרובה: לולאה סדרתית, כל משתמש מאומת מול השרת לפני שממשיכים =====
+  // authorize בשרת הוא toggle, ולכן לפני כל אישור בודקים את המצב העדכני בשרת
+  // (קריאה על משתמש שכבר מאושר הייתה מבטלת לו את האישור), ואחרי האישור מוודאים
+  // מהתשובה ש-is_authorized באמת true. המייל נשלח רק דרך השרת (בלי fallback
+  // ל-EmailJS), ורק אחרי שהאישור אומת. כל תקלה עוצרת את הריצה.
+  // השרת מגביל ל-100 בקשות לדקה וכל משתמש = 3 בקשות, ולכן יש המתנה בין משתמשים.
+  const BULK_GAP_MS = 2000;
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const serverMessage = (error) => error.response?.data?.message || error.message || 'שגיאה לא ידועה';
+
+  // 429 = השרת דחה את הבקשה לפני שטיפל בה, ולכן בטוח לחזור עליה אחרי המתנה
+  const requestWithRateLimit = async (makeRequest) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await makeRequest();
+      } catch (error) {
+        if (error.response?.status !== 429 || attempt >= 3) throw error;
+        const waitSec = Number(error.response.headers?.['retry-after']) || 30;
+        setBulkRun(prev => prev && { ...prev, waitingMsg: `השרת ביקש להאט - ממתין ${waitSec} שניות וממשיך` });
+        await sleep(waitSec * 1000);
+        setBulkRun(prev => prev && { ...prev, waitingMsg: null });
+      }
+    }
+  };
+
+  const fetchFreshUser = async (userId) => {
+    const response = await requestWithRateLimit(() =>
+      axios.get(`${API_BASE}/api/usernews/${userId}`, { headers: getAuthHeaders(), timeout: 60000 }));
+    const full = response.data?.data;
+    if (full) setFullUsers(prev => ({ ...prev, [userId]: full }));
+    return full;
+  };
+
+  const setBulkStep = (userId, step, extra = {}) =>
+    setBulkStatus(prev => ({ ...prev, [userId]: { step, ...extra } }));
+
+  // מייל אישור דרך השרת בלבד; הצלחה = תשובת 2xx עם success מהשרת
+  const sendApprovalEmailVerified = async (user, fresh) => {
+    const personalEmail = getPersonalEmail({ ...user, ...fresh }, manualEmails);
+    const payload = {
+      type: 'approval',
+      userId: user._id,
+      name: user.full_name || user.username,
+      organizationName: organization.name
+    };
+    if (personalEmail) payload.to = personalEmail;
+    const response = await requestWithRateLimit(() =>
+      axios.post(`${API_BASE}/api/notifications/email`, payload, { headers: getAuthHeaders(), timeout: 60000 }));
+    if (response.data?.success !== true) {
+      throw new Error(response.data?.message || 'השרת לא אישר את שליחת המייל');
+    }
+    return response.data.data?.to;
+  };
+
+  // מחזיר 'done' / 'skipped' / 'email_failed', וזורק שגיאה אם האישור עצמו נכשל
+  const approveOneVerified = async (user) => {
+    const id = user._id;
+
+    setBulkStep(id, 'checking');
+    const fresh = await fetchFreshUser(id);
+    if (!fresh) throw new Error('המשתמש לא נמצא בשרת');
+    if (fresh.is_authorized) {
+      setUsers(prev => prev.map(u => u._id === id ? { ...u, is_authorized: true } : u));
+      setBulkStep(id, 'skipped');
+      return 'skipped';
+    }
+
+    setBulkStep(id, 'authorizing');
+    try {
+      const response = await requestWithRateLimit(() =>
+        axios.patch(`${API_BASE}/api/usernews/${id}/authorize`, {}, { headers: getAuthHeaders(), timeout: 60000 }));
+      if (response.data?.data?.is_authorized !== true) {
+        throw new Error('השרת לא החזיר is_authorized=true');
+      }
+    } catch (error) {
+      // timeout / ניתוק: ייתכן שהבקשה כן עברה בשרת. בודקים את המצב בפועל
+      // ולא שולחים שוב (שליחה חוזרת של toggle הייתה מבטלת את האישור).
+      const after = await fetchFreshUser(id).catch(() => null);
+      if (!after?.is_authorized) throw new Error(`האישור בשרת נכשל: ${serverMessage(error)}`);
+    }
+    setUsers(prev => prev.map(u => u._id === id ? { ...u, is_authorized: true } : u));
+
+    setBulkStep(id, 'emailing');
+    try {
+      const to = await sendApprovalEmailVerified(user, fresh);
+      setBulkStep(id, 'done', { to });
+      return 'done';
+    } catch (error) {
+      setBulkStep(id, 'email_failed', { error: serverMessage(error) });
+      return 'email_failed';
+    }
+  };
+
+  const runBulkApprove = async () => {
+    setConfirmBulk(false);
+    const queue = users.filter(u => selectedIds[u._id] && !u.is_authorized);
+    if (!queue.length || bulkRunning) return;
+
+    const warnOnLeave = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warnOnLeave);
+    bulkStopRef.current = false;
+
+    const counts = { done: 0, skipped: 0, email_failed: 0, failed: 0 };
+    const problems = [];
+    let stoppedReason = null;
+    setBulkStatus(Object.fromEntries(queue.map(u => [u._id, { step: 'queued' }])));
+    setBulkRun({ running: true, total: queue.length, processed: 0, currentName: '', counts: { ...counts }, problems: [], stoppedReason: null, waitingMsg: null });
+
+    try {
+      for (let i = 0; i < queue.length; i++) {
+        if (bulkStopRef.current) {
+          stoppedReason = 'הריצה נעצרה ידנית';
+          break;
+        }
+        const user = queue[i];
+        const name = user.full_name || user.username || 'ללא שם';
+        setBulkRun(prev => ({ ...prev, currentName: name }));
+
+        let result;
+        try {
+          result = await approveOneVerified(user);
+        } catch (error) {
+          setBulkStep(user._id, 'failed', { error: error.message });
+          problems.push({ id: user._id, name, kind: 'failed', error: error.message });
+          result = 'failed';
+        }
+        counts[result]++;
+        if (result === 'email_failed') {
+          problems.push({ id: user._id, name, kind: 'email_failed' });
+        }
+        // מי שטופל (גם אם רק המייל נכשל) יורד מהבחירה, כך שלחיצה נוספת ממשיכה מהבא בתור
+        if (result !== 'failed') {
+          setSelectedIds(prev => { const next = { ...prev }; delete next[user._id]; return next; });
+        }
+        setBulkRun(prev => ({ ...prev, processed: i + 1, counts: { ...counts }, problems: [...problems] }));
+
+        if (result === 'failed') {
+          stoppedReason = `הריצה נעצרה: האישור של ${name} לא אומת בשרת`;
+          break;
+        }
+        if (result === 'email_failed') {
+          stoppedReason = `הריצה נעצרה: ${name} אושר/ה, אבל שליחת המייל נכשלה`;
+          break;
+        }
+        if (i < queue.length - 1) await sleep(BULK_GAP_MS);
+      }
+    } finally {
+      window.removeEventListener('beforeunload', warnOnLeave);
+      // משתמשים שלא הגענו אליהם חוזרים למצב רגיל (ונשארים מסומנים להמשך)
+      setBulkStatus(prev => Object.fromEntries(Object.entries(prev).filter(([, s]) => s.step !== 'queued')));
+      setBulkRun(prev => ({ ...prev, running: false, currentName: '', waitingMsg: null, stoppedReason }));
+      const summary = `${counts.done} אושרו וקיבלו מייל` +
+        (counts.skipped ? ` · ${counts.skipped} כבר היו מאושרים` : '') +
+        (counts.email_failed ? ` · ${counts.email_failed} בלי מייל` : '') +
+        (counts.failed ? ` · ${counts.failed} נכשלו` : '');
+      showToast(stoppedReason ? 'error' : 'success',
+        stoppedReason ? 'האישור המרובה נעצר' : 'האישור המרובה הסתיים', summary);
+    }
+  };
+
+  // שליחה חוזרת של מייל למי שאושר בריצה אבל המייל שלו נכשל
+  const retryBulkEmail = async (userId) => {
+    const user = users.find(u => u._id === userId);
+    if (!user || bulkRunning) return;
+    setBulkStep(userId, 'emailing');
+    try {
+      const to = await sendApprovalEmailVerified(user, fullUsersRef.current[userId] || {});
+      setBulkStep(userId, 'done', { to });
+      setBulkRun(prev => prev && {
+        ...prev,
+        counts: { ...prev.counts, done: prev.counts.done + 1, email_failed: prev.counts.email_failed - 1 },
+        problems: prev.problems.filter(p => p.id !== userId)
+      });
+      showToast('success', 'מייל אישור נשלח (דרך השרת)', to ? `אל: ${to}` : '');
+    } catch (error) {
+      setBulkStep(userId, 'email_failed', { error: serverMessage(error) });
+      showToast('error', 'שליחת המייל נכשלה שוב', serverMessage(error));
+    }
+  };
+
+  const closeBulkPanel = () => {
+    setBulkRun(null);
+    setBulkStatus({});
+  };
+
+  const toggleSelected = (userId) =>
+    setSelectedIds(prev => {
+      const next = { ...prev };
+      if (next[userId]) delete next[userId]; else next[userId] = true;
+      return next;
+    });
+
   // ===== דחיית משתמש =====
   const handleRejectUser = async (userId) => {
     const user = users.find(u => u._id === userId);
-    if (!user || busyUserIds[userId]) return;
+    if (!user || busyUserIds[userId] || bulkRunning) return;
     setBusy(userId, true);
 
     try {
@@ -1044,6 +1256,29 @@ const OrganizationData = ({ organization, onLogout }) => {
   const totalPages = Math.max(1, Math.ceil(visibleUsers.length / USERS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
   const pagedUsers = visibleUsers.slice((safePage - 1) * USERS_PER_PAGE, safePage * USERS_PER_PAGE);
+
+  // בחירה לאישור מרובה - רק משתמשים ממתינים
+  const selectedCount = users.filter(u => selectedIds[u._id] && !u.is_authorized).length;
+  const pagePending = pagedUsers.filter(u => !u.is_authorized);
+  const pageSelectedCount = pagePending.filter(u => selectedIds[u._id]).length;
+  const pageAllSelected = pagePending.length > 0 && pageSelectedCount === pagePending.length;
+  const filteredPending = visibleUsers.filter(u => !u.is_authorized);
+
+  const togglePageSelection = () =>
+    setSelectedIds(prev => {
+      const next = { ...prev };
+      pagePending.forEach(u => {
+        if (pageAllSelected) delete next[u._id]; else next[u._id] = true;
+      });
+      return next;
+    });
+
+  const selectAllFilteredPending = () =>
+    setSelectedIds(prev => {
+      const next = { ...prev };
+      filteredPending.forEach(u => { next[u._id] = true; });
+      return next;
+    });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1250,12 +1485,152 @@ const OrganizationData = ({ organization, onLogout }) => {
               </div>
             </div>
 
-            <p className="table-hint">💡 לחיצה על שורת משתמש פותחת את כל הפרטים המלאים שלו</p>
+            <p className="table-hint">💡 לחיצה על שורת משתמש פותחת את כל הפרטים המלאים שלו · סמנו משתמשים ממתינים כדי לאשר כמה ביחד</p>
+
+            {(selectedCount > 0 || bulkRun) && (
+              <div className="bulk-panel">
+                {!bulkRunning && (
+                  <div className="bulk-bar">
+                    <span className="bulk-count">
+                      נבחרו <strong>{selectedCount}</strong> משתמשים ממתינים
+                    </span>
+                    {filteredPending.length > selectedCount && (
+                      <button className="bulk-link" onClick={selectAllFilteredPending}>
+                        סמן את כל {filteredPending.length} הממתינים בסינון הנוכחי
+                      </button>
+                    )}
+                    <div className="bulk-bar-actions">
+                      {confirmBulk ? (
+                        <>
+                          <span className="bulk-confirm-text">
+                            לאשר {selectedCount} משתמשים ולשלוח {selectedCount} מיילים?
+                          </span>
+                          <button className="btn btn-approve" onClick={runBulkApprove}>כן, התחל</button>
+                          <button className="btn btn-ghost" onClick={() => setConfirmBulk(false)}>ביטול</button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="btn btn-approve"
+                            disabled={!selectedCount}
+                            onClick={() => setConfirmBulk(true)}
+                          >
+                            ✓ אשר נבחרים ({selectedCount})
+                          </button>
+                          {selectedCount > 0 && (
+                            <button className="btn btn-ghost" onClick={() => { setSelectedIds({}); setConfirmBulk(false); }}>
+                              נקה בחירה
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {selectedCount > 100 && (
+                      <p className="bulk-quota-note">
+                        ⚠️ מכסת Brevo היא 300 מיילים ביום, משותפת לכל המיילים של המערכת
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {bulkRun && (
+                  <div className={`bulk-progress ${bulkRunning ? 'running' : bulkRun.stoppedReason ? 'stopped' : 'finished'}`}>
+                    <div className="bulk-progress-head">
+                      <span className="bulk-progress-title">
+                        {bulkRunning
+                          ? <>מאשר {Math.min(bulkRun.processed + 1, bulkRun.total)} מתוך {bulkRun.total}: <strong>{bulkRun.currentName}</strong></>
+                          : bulkRun.stoppedReason
+                            ? `⚠️ ${bulkRun.stoppedReason}`
+                            : `✓ הסתיים - ${bulkRun.processed} מתוך ${bulkRun.total} טופלו`}
+                      </span>
+                      {bulkRunning ? (
+                        <button
+                          className="btn btn-revoke"
+                          disabled={bulkRun.stopRequested}
+                          onClick={() => { bulkStopRef.current = true; setBulkRun(prev => ({ ...prev, stopRequested: true })); }}
+                        >
+                          {bulkRun.stopRequested ? 'עוצר אחרי המשתמש הנוכחי...' : '⏹ עצור'}
+                        </button>
+                      ) : (
+                        <button className="btn btn-ghost" onClick={closeBulkPanel}>סגור</button>
+                      )}
+                    </div>
+
+                    <div className="bulk-progress-track">
+                      <div
+                        className="bulk-progress-fill"
+                        style={{ width: `${(bulkRun.processed / bulkRun.total) * 100}%` }}
+                      />
+                    </div>
+
+                    <div className="bulk-counts">
+                      <span className="bulk-chip ok">✓ אושרו + מייל: {bulkRun.counts.done}</span>
+                      {bulkRun.counts.skipped > 0 && (
+                        <span className="bulk-chip muted">⏭ כבר היו מאושרים: {bulkRun.counts.skipped}</span>
+                      )}
+                      {bulkRun.counts.email_failed > 0 && (
+                        <span className="bulk-chip warn">⚠ אושרו בלי מייל: {bulkRun.counts.email_failed}</span>
+                      )}
+                      {bulkRun.counts.failed > 0 && (
+                        <span className="bulk-chip bad">✕ האישור נכשל: {bulkRun.counts.failed}</span>
+                      )}
+                      {bulkRunning && (
+                        <span className="bulk-eta">
+                          כ-{Math.max(1, Math.ceil(((bulkRun.total - bulkRun.processed) * 3.5) / 60))} דק' נותרו · אל תסגרו את הדף
+                        </span>
+                      )}
+                    </div>
+
+                    {bulkRun.waitingMsg && <p className="bulk-waiting">⏳ {bulkRun.waitingMsg}</p>}
+
+                    {!bulkRunning && bulkRun.problems.length > 0 && (
+                      <ul className="bulk-problems">
+                        {bulkRun.problems.map(p => (
+                          <li key={p.id}>
+                            <strong>{p.name}</strong>
+                            {p.kind === 'failed'
+                              ? <> - לא אושר: {p.error}</>
+                              : <> - אושר/ה, המייל לא נשלח{bulkStatus[p.id]?.error ? `: ${bulkStatus[p.id].error}` : ''}</>}
+                            {p.kind === 'email_failed' && (
+                              <button
+                                className="bulk-link"
+                                disabled={bulkStatus[p.id]?.step === 'emailing'}
+                                onClick={() => retryBulkEmail(p.id)}
+                              >
+                                {bulkStatus[p.id]?.step === 'emailing' ? 'שולח...' : 'שלח מייל שוב'}
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {!bulkRunning && bulkRun.stoppedReason && selectedCount > 0 && (
+                      <p className="bulk-resume-note">
+                        {selectedCount} משתמשים עדיין מסומנים. לחיצה על "אשר נבחרים" תמשיך מהם.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="table-container">
               <table className="users-table">
                 <thead>
                   <tr>
+                    <th className="th-select">
+                      <input
+                        type="checkbox"
+                        className="select-checkbox"
+                        ref={el => { if (el) el.indeterminate = pageSelectedCount > 0 && !pageAllSelected; }}
+                        checked={pageAllSelected}
+                        disabled={!pagePending.length || bulkRunning}
+                        onChange={togglePageSelection}
+                        title="סמן את כל הממתינים בעמוד"
+                        aria-label="סמן את כל הממתינים בעמוד"
+                      />
+                    </th>
                     <th className="th-expand"></th>
                     <th>משתמש</th>
                     <th>🎓 מייל אוניברסיטאי</th>
@@ -1273,13 +1648,27 @@ const OrganizationData = ({ organization, onLogout }) => {
                     const personalEmail = getPersonalEmail(merged, manualEmails);
                     const isExpanded = expandedUserId === user._id;
                     const isBusy = !!busyUserIds[user._id];
+                    const rowBulk = bulkStatus[user._id];
+                    const rowBulkActive = rowBulk && ['checking', 'authorizing', 'emailing'].includes(rowBulk.step);
                     return (
                       <React.Fragment key={user._id}>
                         <tr
-                          className={`clickable-row ${user.is_authorized ? "authorized" : "not-authorized"} ${isExpanded ? 'expanded' : ''}`}
+                          className={`clickable-row ${user.is_authorized ? "authorized" : "not-authorized"} ${isExpanded ? 'expanded' : ''} ${selectedIds[user._id] && !user.is_authorized ? 'selected' : ''} ${rowBulkActive ? 'bulk-active' : ''}`}
                           onClick={(e) => handleRowClick(user, e)}
                           title={isExpanded ? "לחץ לסגירת הפרטים" : "לחץ להצגת פרטים מלאים"}
                         >
+                          <td className="td-select">
+                            {!user.is_authorized && (
+                              <input
+                                type="checkbox"
+                                className="select-checkbox"
+                                checked={!!selectedIds[user._id]}
+                                disabled={bulkRunning}
+                                onChange={() => toggleSelected(user._id)}
+                                aria-label={`סמן את ${user.full_name || user.username || 'המשתמש'} לאישור`}
+                              />
+                            )}
+                          </td>
                           <td className="td-expand">
                             <span className={`chevron ${isExpanded ? 'rotated' : ''}`}>▾</span>
                           </td>
@@ -1316,9 +1705,18 @@ const OrganizationData = ({ organization, onLogout }) => {
                             </select>
                           </td>
                           <td>
-                            <span className={`status-badge ${user.is_authorized ? "authorized" : "not-authorized"}`}>
-                              {user.is_authorized ? "מאושר" : "ממתין"}
-                            </span>
+                            {rowBulk ? (
+                              <span
+                                className={`bulk-step bulk-step-${rowBulk.step}`}
+                                title={rowBulk.error || (rowBulk.to ? `נשלח אל ${rowBulk.to}` : '')}
+                              >
+                                {BULK_STEP_LABELS[rowBulk.step]}
+                              </span>
+                            ) : (
+                              <span className={`status-badge ${user.is_authorized ? "authorized" : "not-authorized"}`}>
+                                {user.is_authorized ? "מאושר" : "ממתין"}
+                              </span>
+                            )}
                           </td>
                           <td>
                             <div className="actions-container">
@@ -1327,14 +1725,14 @@ const OrganizationData = ({ organization, onLogout }) => {
                                   <button
                                     onClick={() => handleAuthorizeToggle(user._id)}
                                     className="btn btn-approve"
-                                    disabled={isBusy}
+                                    disabled={isBusy || bulkRunning}
                                   >
                                     {isBusy ? '...' : '✓ אשר'}
                                   </button>
                                   <button
                                     onClick={() => handleRejectUser(user._id)}
                                     className="btn btn-reject"
-                                    disabled={isBusy}
+                                    disabled={isBusy || bulkRunning}
                                   >
                                     ✕ דחה
                                   </button>
@@ -1344,7 +1742,7 @@ const OrganizationData = ({ organization, onLogout }) => {
                                 <button
                                   onClick={() => handleAuthorizeToggle(user._id)}
                                   className="btn btn-revoke"
-                                  disabled={isBusy}
+                                  disabled={isBusy || bulkRunning}
                                 >
                                   {isBusy ? '...' : 'ביטול אישור'}
                                 </button>
@@ -1370,7 +1768,7 @@ const OrganizationData = ({ organization, onLogout }) => {
                         </tr>
                         {isExpanded && (
                           <tr className="expand-row">
-                            <td colSpan={8}>
+                            <td colSpan={9}>
                               <UserDetailPanel
                                 user={getMergedUser(user)}
                                 loading={!!detailLoading[user._id]}
@@ -1387,7 +1785,7 @@ const OrganizationData = ({ organization, onLogout }) => {
                   })}
                   {pagedUsers.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="empty-state">
+                      <td colSpan={9} className="empty-state">
                         <div className="empty-illustration">🔎</div>
                         לא נמצאו משתמשים התואמים את החיפוש
                       </td>
