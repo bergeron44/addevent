@@ -609,15 +609,27 @@ const OrganizationData = ({ organization, onLogout }) => {
     checkHealth();
   }, []);
 
-  // קבלת משתמשי הארגון (limit גבוה - ברירת המחדל של השרת היא 50 בלבד)
+  // קבלת משתמשי הארגון
+  // השרת מחזיר את כל המשתמשים (מכל הארגונים) ממוינים מהחדש לישן, בעמודים של limit.
+  // בקשה אחת עם limit=1000 החזירה רק את 1000 האחרונים, ולכן הרשימה נתקעה סביב 993
+  // ומשתמשים ותיקים נעלמו ממנה. עכשיו עוברים על כל העמודים עד עמוד חלקי.
+  // _t עוקף את ה-cache של השרת (10 דקות, לפי ה-URL) כדי שנרשמים חדשים יופיעו מיד.
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get(`${API_BASE}/api/usernews?limit=1000`, {
-          headers: getAuthHeaders()
-        });
-
-        const allUsers = response.data.data || [];
+        const PAGE_SIZE = 1000;
+        const MAX_PAGES = 50;
+        const loadedAt = Date.now();
+        const allUsers = [];
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          const response = await axios.get(
+            `${API_BASE}/api/usernews?limit=${PAGE_SIZE}&page=${page}&_t=${loadedAt}`,
+            { headers: getAuthHeaders(), timeout: 60000 }
+          );
+          const batch = response.data.data || [];
+          allUsers.push(...batch);
+          if (batch.length < PAGE_SIZE) break;
+        }
 
         const filteredUsers = allUsers.filter(user => {
           if (!user.full_name || user.full_name.trim() === '') return false;
